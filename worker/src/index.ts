@@ -1,3 +1,4 @@
+import { sendAlert } from "./alert";
 import { readBody } from "./body";
 import type { Env, RejectReason } from "./env";
 import { fingerprints, formatterOf } from "./fingerprint";
@@ -204,8 +205,12 @@ export default {
     }
     return ingest(request, env);
   },
-  /** Daily cron (0 2 * * *): roll up day D-1 (UTC) into D1. */
+  /** Daily cron (0 2 * * *): roll up day D-1 (UTC) into D1, alert on zero config events. */
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
-    await rollupDay(env, previousDay(controller.scheduledTime));
+    const day = previousDay(controller.scheduledTime);
+    const configEvents = await rollupDay(env, day);
+    if (configEvents === 0) {
+      await sendAlert(env, `gqlmd telemetry: no config events on ${day} (UTC)`);
+    }
   },
 } satisfies ExportedHandler<Env>;

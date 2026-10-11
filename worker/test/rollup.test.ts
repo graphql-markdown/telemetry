@@ -228,3 +228,43 @@ describe("scheduled", () => {
     expect(sqls[0]).toContain(`'${DAY} 00:00:00'`);
   });
 });
+
+describe("alert", () => {
+  const run = (webhook: string | undefined) =>
+    worker.scheduled(
+      { scheduledTime: Date.parse("2026-10-11T02:00:00Z"), cron: "0 2 * * *" } as ScheduledController,
+      makeEnv({ ALERT_WEBHOOK: webhook }),
+    );
+  const hookCalls = () =>
+    fetchMock.mock.calls.filter(([url]) => String(url).startsWith("https://hooks.test"));
+
+  it("fires on zero config events", async () => {
+    mockAe({ blob1: [{ value: "create", raw: 2, debounced_1h: 1, debounced_1d: 1 }] });
+    await run("https://hooks.test/x");
+    const calls = hookCalls();
+    expect(calls).toHaveLength(1);
+    const body = JSON.parse(String((calls[0][1] as RequestInit).body));
+    expect(body.content).toContain("2026-10-10");
+    expect(body.text).toBe(body.content);
+  });
+
+  it("stays silent when config events arrived", async () => {
+    mockAe(base);
+    await run("https://hooks.test/x");
+    expect(hookCalls()).toHaveLength(0);
+  });
+
+  it("does nothing without a webhook", async () => {
+    mockAe({});
+    await run(undefined);
+    expect(hookCalls()).toHaveLength(0);
+  });
+
+  it("survives a failing webhook", async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      if (String(input).startsWith("https://hooks.test")) throw new Error("down");
+      return Response.json({ data: [] });
+    });
+    await expect(run("https://hooks.test/x")).resolves.toBeUndefined();
+  });
+});
