@@ -60,6 +60,44 @@ const isRetired = (env: Env, version: unknown): boolean => {
   return retired.includes(String(version));
 };
 
+const QUARANTINE_TTL_SECONDS = 3600;
+
+/** Cache API key for a quarantine entry. The Cache API needs a URL. */
+const quarantineRequest = (fp: string, colo: string): Request => {
+  return new Request(`https://quarantine.invalid/quarantine:${fp}:${colo}`);
+};
+
+/**
+ * Anti-abuse for one `(fp, colo)`. `colo` is used in memory and in the cache
+ * key only, never stored. Returns "drop" above the hard ceiling, otherwise
+ * whether the event is quarantined (an active entry, or the limit just tripped).
+ */
+const checkAbuse = async (
+  request: Request,
+  env: Env,
+  fp: string,
+): Promise<"drop" | "quarantined" | "ok"> => {
+  const colo = (request as { cf?: { colo?: string } }).cf?.colo ?? "x";
+  const key = `${fp}:${colo}`;
+  if (env.RL_HARD && !(await env.RL_HARD.limit({ key })).success) {
+    return "drop";
+  }
+  const cache = caches.default;
+  const entry = quarantineRequest(fp, colo);
+  let quarantined = (await cache.match(entry)) !== undefined;
+  if (env.RL && !(await env.RL.limit({ key })).success) {
+    quarantined = true;
+    // Written (and so renewed) every time the limit trips.
+    await cache.put(
+      entry,
+      new Response(null, {
+        headers: { "cache-control": `max-age=${QUARANTINE_TTL_SECONDS}` },
+      }),
+    );
+  }
+  return quarantined ? "quarantined" : "ok";
+};
+
 const ingest = async (request: Request, env: Env): Promise<Response> => {
   const type = (request.headers.get("content-type") ?? "").toLowerCase();
   if (!type.startsWith("application/json")) {
@@ -87,9 +125,13 @@ const ingest = async (request: Request, env: Env): Promise<Response> => {
     return reject(env, result.reason);
   }
   const { fp, fpShape } = await fingerprints(result.value);
+  const abuse = await checkAbuse(request, env, fp);
+  if (abuse === "drop") {
+    return reject(env, "rate-limit");
+  }
   env.EVENTS.writeDataPoint({
     indexes: [fp],
-    blobs: buildBlobs(result.value, fp, fpShape, false),
+    blobs: buildBlobs(result.value, fp, fpShape, abuse === "quarantined"),
     doubles: [1],
   });
   return new Response(null, { status: 202 });

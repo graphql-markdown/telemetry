@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, type Mock } from "vitest";
 
+import type { Env } from "../src/env";
 import worker from "../src/index";
 import { gzip, mockEnv, payload, post } from "./helpers";
 
@@ -176,5 +177,64 @@ describe("fingerprints", () => {
     const b = await fpOf({ config: { schema: "<path>" } });
     expect(b.fp).not.toBe(a.fp);
     expect(b.fpShape).not.toBe(a.fpShape);
+  });
+});
+
+describe("anti-abuse", () => {
+  const limiter = (success: boolean) => ({
+    limit: vi.fn(async (_options: { key: string }) => ({ success })),
+  });
+  const send = (env: Env, extra: Record<string, unknown>, colo = "AMS") =>
+    worker.fetch(
+      post(JSON.stringify(payload(extra)), JSON_HEADERS, { cf: { colo } }),
+      env,
+    );
+  const quarantinedBlob = (events: { writeDataPoint: Mock }, call = 0) =>
+    events.writeDataPoint.mock.calls[call][0].blobs[16];
+
+  it("keys both limiters by fp and colo", async () => {
+    const RL = limiter(true);
+    const RL_HARD = limiter(true);
+    const { env, events } = mockEnv({ RL, RL_HARD } as Partial<Env>);
+    await send(env, { config: { schema: "<path>", id: "<string>" } }, "CDG");
+    const fp = events.writeDataPoint.mock.calls[0][0].blobs[1];
+    expect(RL.limit).toHaveBeenCalledWith({ key: `${fp}:CDG` });
+    expect(RL_HARD.limit).toHaveBeenCalledWith({ key: `${fp}:CDG` });
+    expect(quarantinedBlob(events)).toBe("0");
+  });
+
+  it("falls back to x when the colo is unknown", async () => {
+    const RL = limiter(true);
+    const { env } = mockEnv({ RL } as Partial<Env>);
+    await worker.fetch(post(JSON.stringify(payload({ pkgVersion: "9.9.1" })), JSON_HEADERS), env);
+    expect(RL.limit.mock.calls[0][0].key).toMatch(/:x$/);
+  });
+
+  it("flags quarantined events and keeps flagging them while the entry exists", async () => {
+    const extra = { config: { schema: "<path>", baseURL: "<url>" } };
+    const tripped = mockEnv({ RL: limiter(false), RL_HARD: limiter(true) } as Partial<Env>);
+    expect((await send(tripped.env, extra, "FRA")).status).toBe(202);
+    expect(quarantinedBlob(tripped.events)).toBe("1");
+
+    // Rate is back to normal, but the cached quarantine entry is still there.
+    const calm = mockEnv({ RL: limiter(true), RL_HARD: limiter(true) } as Partial<Env>);
+    expect((await send(calm.env, extra, "FRA")).status).toBe(202);
+    expect(quarantinedBlob(calm.events)).toBe("1");
+
+    // Another colo is not affected.
+    const other = mockEnv({ RL: limiter(true), RL_HARD: limiter(true) } as Partial<Env>);
+    await send(other.env, extra, "SYD");
+    expect(quarantinedBlob(other.events)).toBe("0");
+  });
+
+  it("hard-drops above the ceiling with a rate-limit reject", async () => {
+    const { env, events, rejects } = mockEnv({
+      RL: limiter(true),
+      RL_HARD: limiter(false),
+    } as Partial<Env>);
+    const res = await send(env, { config: { schema: "<path>", id: "<string>", force: true } });
+    expect(res.status).toBe(204);
+    expect(events.writeDataPoint).not.toHaveBeenCalled();
+    expect(rejects.writeDataPoint.mock.calls[0][0].blobs).toEqual(["rate-limit"]);
   });
 });
