@@ -134,12 +134,6 @@ describe("validate: failures", () => {
   it.each([
     ["missing event", { event: undefined }],
     ["non-string trigger", { trigger: 3 }],
-    ["bad pkgVersion", { pkgVersion: "latest" }],
-    ["pkgVersion with path", { pkgVersion: "1.2.3/../x" }],
-    ["pkgVersion two parts", { pkgVersion: "1.2" }],
-    ["fractional nodeMajor", { nodeMajor: 20.5 }],
-    ["huge nodeMajor", { nodeMajor: 1000 }],
-    ["string graphqlMajor", { graphqlMajor: "16" }],
     ["non-boolean ci", { ci: "false" }],
     ["non-boolean wsl", { wsl: 0 }],
     ["negative unknownKeys", { unknownKeys: -1 }],
@@ -220,5 +214,63 @@ describe("validate: key allowlist", () => {
       loaders: { GitLoader: { module: "@graphql-tools/git-loader", options: {} } },
     };
     expect(validate(withConfig(config))).toMatchObject({ ok: true });
+  });
+});
+
+describe("validate: closed sets for free-text channels", () => {
+  it.each([
+    ["1.2.3", "1.2.3"],
+    ["1.2.3-rc.1", "1.2.3-rc.1"],
+    ["1.2.3-beta.4-my-secret-branch", "1.2.3-beta.4"],
+    ["1.2.3-beta-secret", "1.2.3-beta.0"],
+    ["1.2.3-secretbranch.1", "unknown-value"],
+    ["1.2.3+build.secret", "unknown-value"],
+    ["latest", "unknown-value"],
+    ["1.2.3/../x", "unknown-value"],
+    ["1.2", "unknown-value"],
+  ])("normalises pkgVersion %s", (input, expected) => {
+    expect(validate({ ...base(), pkgVersion: input })).toMatchObject({
+      ok: true,
+      value: { pkgVersion: expected },
+    });
+  });
+
+  it("maps unknown package names to unknown-value", () => {
+    for (const pkg of ["@graphql-markdown/acme-secret", "create-graphql-markdown-docs-x"]) {
+      expect(validate({ ...base(), pkg })).toMatchObject({ value: { pkg: "unknown-value" } });
+    }
+    expect(validate({ ...base(), pkg: "create-graphql-markdown-docs" })).toMatchObject({
+      value: { pkg: "create-graphql-markdown-docs" },
+    });
+  });
+
+  it("rejects unknown package names in config values", () => {
+    expect(validate(withConfig({ formatter: "@graphql-markdown/acme-secret" })).ok).toBe(false);
+    expect(validate(withConfig({ formatter: "@graphql-markdown/formatters/hugo" })).ok).toBe(true);
+  });
+
+  it("rejects numbers other than integers 0-1000", () => {
+    for (const n of [1234567890, -1, 1.5, 1001]) {
+      expect(validate(withConfig({ force: n })).ok).toBe(false);
+    }
+    expect(validate(withConfig({ force: 1000 })).ok).toBe(true);
+  });
+
+  it("limits key tokens, array length and object size", () => {
+    expect(validate(withConfig({ metatags: [{ "<key:999>": "<string>" }] })).ok).toBe(false);
+    expect(validate(withConfig({ metatags: [{ "<key:99>": "<string>" }] })).ok).toBe(true);
+    expect(validate(withConfig({ skipDocDirective: Array(51).fill("<string>") })).ok).toBe(false);
+    expect(validate(withConfig({ skipDocDirective: Array(50).fill("<string>") })).ok).toBe(true);
+    const wide = Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`<key:${i}>`, "<string>"]));
+    expect(validate(withConfig({ metatags: [wide] })).ok).toBe(false);
+  });
+
+  it("maps out-of-range node and graphql majors to unknown-value", () => {
+    expect(validate({ ...base(), nodeMajor: 1000, graphqlMajor: 3 })).toMatchObject({
+      value: { nodeMajor: "unknown-value", graphqlMajor: "unknown-value" },
+    });
+    expect(validate({ ...base(), nodeMajor: 20.5, graphqlMajor: "16" })).toMatchObject({
+      value: { nodeMajor: "unknown-value", graphqlMajor: "unknown-value" },
+    });
   });
 });

@@ -151,6 +151,64 @@ describe("POST /v1/event", () => {
   });
 });
 
+describe("body bounds", () => {
+  const chunked = (chunks: Uint8Array[], pulled: { n: number }) =>
+    new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const next = chunks[pulled.n];
+        pulled.n += 1;
+        if (next === undefined) {
+          controller.close();
+        } else {
+          controller.enqueue(next);
+        }
+      },
+    });
+
+  it("rejects on a large Content-Length before reading", async () => {
+    const { env, rejects } = mockEnv();
+    const pulled = { n: 0 };
+    const body = chunked([new Uint8Array(10)], pulled);
+    const res = await worker.fetch(
+      post(body, { ...JSON_HEADERS, "content-length": "9000" }, { duplex: "half" }),
+      env,
+    );
+    expect(res.status).toBe(204);
+    expect(pulled.n).toBeLessThanOrEqual(1); // only the stream's initial prefetch
+    expect(rejects.writeDataPoint.mock.calls[0][0].blobs).toEqual(["size"]);
+  });
+
+  it("stops reading a body whose Content-Length lies", async () => {
+    const { env, rejects } = mockEnv();
+    const pulled = { n: 0 };
+    const chunks = Array.from({ length: 1000 }, () => new Uint8Array(1024));
+    const res = await worker.fetch(
+      post(chunked(chunks, pulled), { ...JSON_HEADERS, "content-length": "10" }, { duplex: "half" }),
+      env,
+    );
+    expect(res.status).toBe(204);
+    expect(pulled.n).toBeLessThan(30);
+    expect(rejects.writeDataPoint.mock.calls[0][0].blobs).toEqual(["size"]);
+  });
+
+  it("stops early on a chunked gzip bomb", async () => {
+    const { env, rejects } = mockEnv();
+    const pulled = { n: 0 };
+    const gz = await gzip(JSON.stringify({ pad: "a".repeat(5_000_000) }));
+    const chunks: Uint8Array[] = [];
+    for (let i = 0; i < gz.length; i += 64) chunks.push(gz.slice(i, i + 64));
+    // Tail chunks that must never be read.
+    for (let i = 0; i < 1000; i += 1) chunks.push(new Uint8Array(1024));
+    const res = await worker.fetch(
+      post(chunked(chunks, pulled), { ...JSON_HEADERS, "content-encoding": "gzip" }, { duplex: "half" }),
+      env,
+    );
+    expect(res.status).toBe(204);
+    expect(pulled.n).toBeLessThan(chunks.length - 900);
+    expect(rejects.writeDataPoint.mock.calls[0][0].blobs).toEqual(["size"]);
+  });
+});
+
 describe("fingerprints", () => {
   const fpOf = async (extra: Record<string, unknown>) => {
     const { env, events } = mockEnv();

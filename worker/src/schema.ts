@@ -105,7 +105,7 @@ export const MASK_TOKENS = [
   "<unknown>",
 ] as const;
 /** Pattern of masked object keys, e.g. `<key:0>`. */
-export const KEY_TOKEN_PATTERN = "^<key:\\d+>$";
+export const KEY_TOKEN_PATTERN = "^<key:\\d{1,2}>$";
 
 export const ALLOWLIST = {
   events: EVENTS,
@@ -145,8 +145,61 @@ export const OS_NAMES = [
 
 export const UNKNOWN_VALUE = "unknown-value";
 
-const SEMVER = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
-const FORMATTER_PACKAGE = new RegExp(ALLOWLIST.formatterPackagePattern);
+/** Exact package names; anything else is never stored. */
+const PACKAGE_NAMES: ReadonlySet<string> = new Set([
+  ...[
+    "cli",
+    "core",
+    "docusaurus",
+    "formatters",
+    "graphql",
+    "helpers",
+    "logger",
+    "printer-legacy",
+    "types",
+    "utils",
+    "diff",
+    "nuxt-theme",
+    "telemetry",
+  ].map((name) => `@graphql-markdown/${name}`),
+  "create-graphql-markdown-docs",
+  ...FORMATTER_PRESETS.map((name) => `@graphql-markdown/formatters/${name}`),
+]);
+const PRE_TAGS = "alpha|beta|rc|canary|next";
+const VERSION_EXACT = new RegExp(
+  `^\\d{1,4}\\.\\d{1,4}\\.\\d{1,4}(-(${PRE_TAGS})\\.\\d{1,3})?$`,
+);
+const VERSION_LOOSE = new RegExp(
+  `^(\\d{1,4}\\.\\d{1,4}\\.\\d{1,4})(?:-(${PRE_TAGS})(?:\\.(\\d{1,3}))?(?![0-9A-Za-z]))?`,
+);
+const MAX_ITEMS = 50;
+const MAX_INT = 1000;
+
+/** Closed-set version: exact, else normalised, else `unknown-value`. */
+const normaliseVersion = (value: unknown): string => {
+  if (typeof value !== "string") {
+    return UNKNOWN_VALUE;
+  }
+  if (VERSION_EXACT.test(value)) {
+    return value;
+  }
+  const match = VERSION_LOOSE.exec(value);
+  if (match === null || (match[2] === undefined && value !== match[1])) {
+    return UNKNOWN_VALUE;
+  }
+  return match[2] === undefined
+    ? match[1]
+    : `${match[1]}-${match[2]}.${match[3] ?? "0"}`;
+};
+
+const inRange = (value: unknown, min: number, max: number): boolean => {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= min &&
+    value <= max
+  );
+};
 const KEY_TOKEN = new RegExp(ALLOWLIST.keyTokenPattern);
 const MAX_DEPTH = 8;
 
@@ -296,14 +349,19 @@ const sanitizeSection = (
     return value;
   }
   if (typeof value === "number") {
-    return Number.isFinite(value) ? value : FAIL;
+    return Number.isInteger(value) && value >= 0 && value <= MAX_INT
+      ? value
+      : FAIL;
   }
   if (typeof value === "string") {
-    return VALUE_STRINGS.has(value) || FORMATTER_PACKAGE.test(value)
+    return VALUE_STRINGS.has(value) || PACKAGE_NAMES.has(value)
       ? value
       : FAIL;
   }
   if (Array.isArray(value)) {
+    if (value.length > MAX_ITEMS) {
+      return FAIL;
+    }
     const out: unknown[] = [];
     for (const item of value) {
       const checked = sanitizeSection(item, depth + 1, names);
@@ -315,6 +373,9 @@ const sanitizeSection = (
     return out;
   }
   if (isObject(value)) {
+    if (Object.keys(value).length > MAX_ITEMS) {
+      return FAIL;
+    }
     const out: Json = {};
     for (const [key, item] of Object.entries(value)) {
       if (!KEY_TOKEN.test(key) && !names.has(key)) {
@@ -403,28 +464,19 @@ export const validate = (payload: unknown): ValidationResult => {
   if (typeof payload.pkg !== "string") {
     return fail("schema");
   }
-  out.pkg = FORMATTER_PACKAGE.test(payload.pkg) ? payload.pkg : UNKNOWN_VALUE;
+  out.pkg = PACKAGE_NAMES.has(payload.pkg) ? payload.pkg : UNKNOWN_VALUE;
 
-  if (
-    typeof payload.pkgVersion !== "string" ||
-    !SEMVER.test(payload.pkgVersion)
-  ) {
-    return fail("schema");
-  }
-  out.pkgVersion = payload.pkgVersion;
+  out.pkgVersion = normaliseVersion(payload.pkgVersion);
 
-  if (!isCount(payload.nodeMajor, 99)) {
-    return fail("schema");
-  }
-  out.nodeMajor = payload.nodeMajor;
+  out.nodeMajor = inRange(payload.nodeMajor, 18, 40)
+    ? payload.nodeMajor
+    : UNKNOWN_VALUE;
 
-  if (
-    payload.graphqlMajor !== ALLOWLIST.graphqlMajorUnknown &&
-    !isCount(payload.graphqlMajor, 99)
-  ) {
-    return fail("schema");
-  }
-  out.graphqlMajor = payload.graphqlMajor;
+  out.graphqlMajor =
+    payload.graphqlMajor === ALLOWLIST.graphqlMajorUnknown ||
+    inRange(payload.graphqlMajor, 14, 30)
+      ? payload.graphqlMajor
+      : UNKNOWN_VALUE;
 
   for (const key of ["ci", "firstRun", "container", "wsl"]) {
     if (typeof payload[key] !== "boolean") {
