@@ -49,6 +49,18 @@
     }
   ],
 
+  // Dashboard (static page, no build step) served at /. Only the API routes and
+  // /public* run the Worker first; "/" is protected by Cloudflare Access at the edge.
+  "assets": {
+    "directory": "../dashboard",
+    "binding": "ASSETS",
+    "run_worker_first": ["/v1/*", "/public", "/public/*"]
+  },
+
+  // Access verification (second check) and the optional public aggregates.
+  // Values come from infra/worker.tofu in production.
+  "vars": { "ACCESS_TEAM_DOMAIN": "", "ACCESS_AUD": "", "PUBLIC_STATS": "false" },
+
   // Rollup of day D-1 (UTC).
   "triggers": { "crons": ["0 2 * * *"] }
 
