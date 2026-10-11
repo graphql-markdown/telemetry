@@ -4,6 +4,34 @@ locals {
   worker_name = "gqlmd-telemetry"
 }
 
+resource "cloudflare_d1_database" "telemetry" {
+  account_id = var.account_id
+  name       = local.worker_name
+}
+
+# Read-only token the cron uses for the Analytics Engine SQL API.
+data "cloudflare_api_token_permission_groups_list" "analytics_read" {
+  name      = "Account Analytics Read" # verify: exact permission group name in the v5 data source
+  scope     = "com.cloudflare.api.account"
+  max_items = 1
+}
+
+resource "cloudflare_api_token" "ae_sql" {
+  name = "${local.worker_name}-ae-sql"
+
+  policies = [
+    {
+      effect = "allow"
+      permission_groups = [
+        { id = data.cloudflare_api_token_permission_groups_list.analytics_read.result[0].id },
+      ]
+      resources = {
+        "com.cloudflare.api.account.${var.account_id}" = "*"
+      }
+    },
+  ] # verify: policies and resources attribute shapes against the v5 schema
+}
+
 resource "cloudflare_workers_script" "telemetry" {
   account_id  = var.account_id
   script_name = local.worker_name
@@ -59,7 +87,36 @@ resource "cloudflare_workers_script" "telemetry" {
         period = 60
       }
     },
+    {
+      name = "DB"
+      type = "d1"
+      id   = cloudflare_d1_database.telemetry.id
+    },
+    {
+      name = "AE_SQL_TOKEN"
+      type = "secret_text"
+      text = cloudflare_api_token.ae_sql.value
+    },
+    {
+      name = "ACCOUNT_ID"
+      type = "secret_text"
+      text = var.account_id
+    },
+    {
+      name = "ALERT_WEBHOOK"
+      type = "secret_text"
+      text = var.alert_webhook
+    },
   ] # verify: binding attribute names (namespace_id, simple) against the v5 schema
+}
+
+# Daily rollup of day D-1 (UTC).
+resource "cloudflare_workers_cron_trigger" "rollup" {
+  account_id  = var.account_id
+  script_name = cloudflare_workers_script.telemetry.script_name
+  schedules = [
+    { cron = "0 2 * * *" },
+  ]
 }
 
 resource "cloudflare_workers_custom_domain" "telemetry" {

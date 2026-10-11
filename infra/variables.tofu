@@ -25,3 +25,10 @@ variable "state_passphrase" {
   type        = string
   sensitive   = true
 }
+
+variable "alert_webhook" {
+  description = "Discord/Slack-compatible webhook for the no-events alert. Empty disables it."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
