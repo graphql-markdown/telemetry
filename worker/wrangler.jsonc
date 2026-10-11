@@ -2,10 +2,21 @@
   "name": "gqlmd-telemetry",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-01",
-  "observability": { "enabled": false }
+  "observability": { "enabled": false },
+
+  // Public hostname. Custom domains work with the Cache API (quarantine);
+  // workers.dev does not. The zone must already be on this Cloudflare account.
+  "routes": [
+    { "pattern": "telemetry.graphql-markdown.dev", "custom_domain": true }
+  ],
+
+  // Analytics Engine: raw events and payload-free reject counters.
+  "analytics_engine_datasets": [
+    { "binding": "EVENTS", "dataset": "gqlmd_events" },
+    { "binding": "REJECTS", "dataset": "gqlmd_rejects" }
+  ]
+
   // Bindings are declared in later PRs:
-  // "analytics_engine_datasets": [{ "binding": "EVENTS", "dataset": "gqlmd_events" }],
   // "d1_databases": [{ "binding": "DB", "database_name": "gqlmd-telemetry", "database_id": "..." }],
-  // "ratelimits": [{ "name": "RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } }],
   // "triggers": { "crons": ["0 3 * * *"] },
 }
