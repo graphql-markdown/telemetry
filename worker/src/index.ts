@@ -5,7 +5,7 @@ import type { Env, RejectReason } from "./env";
 import { fingerprints, formatterOf } from "./fingerprint";
 import { previousDay, rollupDay } from "./rollup";
 import { validate } from "./schema";
-import { handleStats } from "./stats";
+import { handlePublic, handleStats } from "./stats";
 
 type Json = Record<string, unknown>;
 
@@ -207,6 +207,15 @@ export default {
         return new Response("Forbidden", { status: 403 });
       }
       return handleStats(url, env);
+    }
+    if (url.pathname === "/public" || url.pathname.startsWith("/public/")) {
+      if (request.method !== "GET") {
+        return new Response("Method Not Allowed", {
+          status: 405,
+          headers: { allow: "GET" },
+        });
+      }
+      return handlePublic(url, env);
     }
     if (url.pathname !== "/v1/event") {
       return new Response("Not Found", { status: 404 });

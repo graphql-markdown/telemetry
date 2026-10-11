@@ -209,3 +209,24 @@ export const handleStats = async (url: URL, env: Env): Promise<Response> => {
       return new Response("Not Found", { status: 404 });
   }
 };
+
+/**
+ * Optional public aggregates (`PUBLIC_STATS=true`), no Access. Reads no request
+ * header. Always the raw measure, the local view and weekly buckets, with the
+ * same n < 5 suppression; quarantined events are never part of `raw`.
+ */
+export const handlePublic = async (url: URL, env: Env): Promise<Response> => {
+  if (env.PUBLIC_STATS !== "true") {
+    return new Response("Not Found", { status: 404 });
+  }
+  if (url.pathname === "/public") {
+    const page = await env.ASSETS?.fetch(new Request(new URL("/public.html", url)));
+    return page && page.ok ? new Response(page.body, page) : new Response("Not Found", { status: 404 });
+  }
+  if (url.pathname === "/public/v1/stats") {
+    const query = parseQuery(url.searchParams);
+    if (!query.ok) return bad(query.error);
+    return statsFor(env, { ...query.value, measure: "raw", view: "local" }, true);
+  }
+  return new Response("Not Found", { status: 404 });
+};

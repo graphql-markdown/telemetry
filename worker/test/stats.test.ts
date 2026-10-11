@@ -175,3 +175,56 @@ describe("GET /v1/stats/rejects", () => {
     expect(body.series).toHaveLength(3);
   });
 });
+
+describe("public aggregates", () => {
+  const pub = (path: string, vars: Partial<Env> = {}, init?: RequestInit) =>
+    worker.fetch(new Request(`https://telemetry.test${path}`, init), {
+      DB: db,
+      ASSETS: { fetch: async () => new Response("<h1>public</h1>") },
+      ...vars,
+    } as unknown as Env);
+
+  it("answers 404 by default and when PUBLIC_STATS is not true", async () => {
+    for (const vars of [{}, { PUBLIC_STATS: "false" }, { PUBLIC_STATS: "1" }]) {
+      expect((await pub("/public", vars)).status).toBe(404);
+      expect((await pub("/public/v1/stats?dim=os", vars)).status).toBe(404);
+    }
+  });
+
+  it("serves the page when enabled, without any Access header", async () => {
+    const res = await pub("/public", { PUBLIC_STATS: "true" });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("public");
+  });
+
+  it("forces raw, local and weekly buckets and still suppresses n < 5", async () => {
+    await db.batch([
+      // Mon 2026-10-05 and Sun 2026-10-11 share the week of 2026-10-05.
+      count("2026-10-05", "0", "os", "linux", "raw", 3),
+      count("2026-10-11", "0", "os", "linux", "raw", 3),
+      count("2026-10-12", "0", "os", "linux", "raw", 2),
+      count("2026-10-05", "1", "os", "linux", "raw", 500),
+      count("2026-10-05", "0", "os", "linux", "debounced_1d", 500),
+      count("2026-10-05", "0", "os", "win32", "raw", 4),
+    ]);
+    const res = await pub(`/public/v1/stats?dim=os&${Q}&measure=debounced_1d&view=all`, {
+      PUBLIC_STATS: "true",
+    });
+    const body = (await res.json()) as any;
+    expect(body).toMatchObject({ measure: "raw", view: "local", granularity: "week" });
+    expect(body.series).toEqual([
+      { day: "2026-10-05", value: "linux", n: 6 },
+      { day: "2026-10-12", value: "linux", n: 2 },
+    ]);
+    expect(body.totals).toEqual([{ value: "linux", n: 8 }]);
+    expect(body.suppressed_count).toBe(1);
+  });
+
+  it("validates params, hides catalog and rejects, and rejects non-GET", async () => {
+    const vars = { PUBLIC_STATS: "true" };
+    expect((await pub("/public/v1/stats?dim=os'--", vars)).status).toBe(400);
+    expect((await pub("/public/v1/stats/catalog", vars)).status).toBe(404);
+    expect((await pub("/public/v1/stats/rejects", vars)).status).toBe(404);
+    expect((await pub("/public", vars, { method: "POST" })).status).toBe(405);
+  });
+});
