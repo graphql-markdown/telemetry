@@ -1,9 +1,11 @@
+import { verifyAccess } from "./access";
 import { sendAlert } from "./alert";
 import { readBody } from "./body";
 import type { Env, RejectReason } from "./env";
 import { fingerprints, formatterOf } from "./fingerprint";
 import { previousDay, rollupDay } from "./rollup";
 import { validate } from "./schema";
+import { handleStats } from "./stats";
 
 type Json = Record<string, unknown>;
 
@@ -194,6 +196,18 @@ const ingest = async (request: Request, env: Env): Promise<Response> => {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === "/v1/stats" || url.pathname.startsWith("/v1/stats/")) {
+      if (request.method !== "GET") {
+        return new Response("Method Not Allowed", {
+          status: 405,
+          headers: { allow: "GET" },
+        });
+      }
+      if (!(await verifyAccess(request, env))) {
+        return new Response("Forbidden", { status: 403 });
+      }
+      return handleStats(url, env);
+    }
     if (url.pathname !== "/v1/event") {
       return new Response("Not Found", { status: 404 });
     }
