@@ -32,3 +32,19 @@ variable "alert_webhook" {
   sensitive   = true
   default     = ""
 }
+
+variable "dashboard_emails" {
+  description = "Email addresses allowed to open the dashboard (one-time PIN login)."
+  type        = list(string)
+}
+
+variable "access_team_domain" {
+  description = "Zero Trust team domain, e.g. myteam.cloudflareaccess.com (JWKS host and JWT issuer)."
+  type        = string
+}
+
+variable "public_stats" {
+  description = "\"true\" enables the public aggregates at /public. Default off."
+  type        = string
+  default     = "false"
+}
