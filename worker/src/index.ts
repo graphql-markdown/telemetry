@@ -1,6 +1,7 @@
 import { readBody } from "./body";
 import type { Env, RejectReason } from "./env";
 import { fingerprints, formatterOf } from "./fingerprint";
+import { previousDay, rollupDay } from "./rollup";
 import { validate } from "./schema";
 
 type Json = Record<string, unknown>;
@@ -202,5 +203,9 @@ export default {
       });
     }
     return ingest(request, env);
+  },
+  /** Daily cron (0 2 * * *): roll up day D-1 (UTC) into D1. */
+  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    await rollupDay(env, previousDay(controller.scheduledTime));
   },
 } satisfies ExportedHandler<Env>;

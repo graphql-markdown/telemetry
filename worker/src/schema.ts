@@ -205,7 +205,7 @@ const KEY_TOKEN = new RegExp(ALLOWLIST.keyTokenPattern);
 const MAX_DEPTH = 8;
 
 /** Every string that may appear as a value inside `config` and `cli`. */
-const VALUE_STRINGS = new Set<string>([
+export const VALUE_STRINGS = new Set<string>([
   ...CI_PROVIDERS,
   ...PACKAGE_MANAGERS,
   ...LOADER_KINDS,
