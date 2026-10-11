@@ -1,0 +1,70 @@
+name: CI
+
+env:
+  CLOUDFLARE_TELEMETRY_DISABLED: "1"
+  WRANGLER_SEND_METRICS: "false"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  worker:
+    name: Typecheck and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code Base
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install modules
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Run Tests
+        run: bun run test
+
+  opentofu:
+    name: OpenTofu
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code Base
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version_file: .opentofu-version
+
+      - name: Format
+        run: tofu fmt -check -recursive
+
+      - name: Init and validate (infra)
+        working-directory: infra
+        run: |
+          tofu init -backend=false
+          tofu validate
+
+      - name: Init and validate (infra/bootstrap)
+        working-directory: infra/bootstrap
+        run: |
+          tofu init -backend=false
+          tofu validate
