@@ -22,7 +22,7 @@ const BLOB_DIMS: ReadonlyArray<readonly [string, string]> = [
 
 type Row = Record<string, string | number>;
 type Counts = Map<string, number>;
-type CountRow = { dim: string; value: string; measure: string; n: number };
+type CountRow = { ci: string; dim: string; value: string; measure: string; n: number };
 
 /** UTC day (YYYY-MM-DD) before the given instant. */
 export const previousDay = (now: number): string => {
@@ -52,15 +52,15 @@ const MEASURE_COLUMNS =
 
 const dimSql = (column: string, day: string): string => {
   return (
-    `SELECT ${column} AS value, ${MEASURE_COLUMNS} FROM gqlmd_events ` +
-    `WHERE ${dayWindow(day)} AND ${CLEAN} GROUP BY value`
+    `SELECT ${column} AS value, blob12 AS ci, ${MEASURE_COLUMNS} FROM gqlmd_events ` +
+    `WHERE ${dayWindow(day)} AND ${CLEAN} GROUP BY value, ci`
   );
 };
 
 const quarantinedSql = (day: string): string => {
   return (
-    `SELECT blob1 AS value, SUM(_sample_interval * double1) AS n ` +
-    `FROM gqlmd_events WHERE ${dayWindow(day)} AND blob17 = '1' GROUP BY value`
+    `SELECT blob1 AS value, blob12 AS ci, SUM(_sample_interval * double1) AS n ` +
+    `FROM gqlmd_events WHERE ${dayWindow(day)} AND blob17 = '1' GROUP BY value, ci`
   );
 };
 
@@ -105,7 +105,7 @@ const add = (counts: Counts, key: string, n: number): void => {
 
 const addMeasures = (counts: Counts, dim: string, value: string, row: Row): void => {
   for (const measure of MEASURES) {
-    add(counts, [dim, value, measure].join(KEY_SEP), Number(row[measure] ?? 0));
+    add(counts, [String(row.ci), dim, value, measure].join(KEY_SEP), Number(row[measure] ?? 0));
   }
 };
 
@@ -185,7 +185,7 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
     }
   }
   for (const row of await query(env, quarantinedSql(day))) {
-    add(counts, ["event", String(row.value), "quarantined"].join(KEY_SEP), Number(row.n));
+    add(counts, [String(row.ci), "event", String(row.value), "quarantined"].join(KEY_SEP), Number(row.n));
   }
 
   const shapes = new Map<string, Shape>();
@@ -206,8 +206,8 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
 
   // Cardinality guard: keep the largest rows.
   const rows: CountRow[] = [...counts].map(([key, n]) => {
-    const [dim, value, measure] = key.split(KEY_SEP);
-    return { dim, value, measure, n };
+    const [ci, dim, value, measure] = key.split(KEY_SEP);
+    return { ci, dim, value, measure, n };
   });
   rows.sort((a, b) => b.n - a.n);
   const kept = rows.slice(0, MAX_ROWS_PER_DAY);
@@ -240,9 +240,9 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
     statements.push(
       db
         .prepare(
-          "INSERT INTO daily_counts (day, dim, value, measure, n) VALUES (?, ?, ?, ?, ?)",
+          "INSERT INTO daily_counts (day, ci, dim, value, measure, n) VALUES (?, ?, ?, ?, ?, ?)",
         )
-        .bind(day, row.dim, row.value, row.measure, row.n),
+        .bind(day, row.ci, row.dim, row.value, row.measure, row.n),
     );
   }
   for (const row of rejects) {

@@ -28,7 +28,8 @@ const mockAe = (fixtures: Fixtures) => {
     if (url.includes("/analytics_engine/sql")) {
       const sql = String((init as RequestInit).body);
       sqls.push(sql);
-      return Response.json({ data: fixtures[keyOf(sql)] ?? [] });
+      const rows = (fixtures[keyOf(sql)] ?? []).map((row) => ({ ci: "0", ...row }));
+      return Response.json({ data: rows });
     }
     return new Response(null, { status: 204 });
   });
@@ -45,7 +46,7 @@ const makeEnv = (extra: Partial<Env> = {}): Env =>
 const counts = async (day = DAY) => {
   const { results } = await db
     .prepare(
-      "SELECT dim, value, measure, n FROM daily_counts WHERE day = ? ORDER BY dim, value, measure",
+      "SELECT ci, dim, value, measure, n FROM daily_counts WHERE day = ? ORDER BY ci, dim, value, measure",
     )
     .bind(day)
     .all();
@@ -127,6 +128,28 @@ describe("rollupDay", () => {
     expect(get("setting.mode", "group", "raw")).toBe(6);
     expect(get("setting.skipDocDirective", "true", "raw")).toBe(6);
     expect(get("setting.baseURL", "/x", "raw")).toBeUndefined();
+  });
+
+  it("keeps CI and local rows for the same config apart", async () => {
+    mockAe({
+      blob1: [
+        { value: "config", ci: "0", raw: 5, debounced_1h: 2, debounced_1d: 2 },
+        { value: "config", ci: "1", raw: 40, debounced_1h: 9, debounced_1d: 3 },
+      ],
+      quarantined: [{ value: "config", ci: "1", n: 7 }],
+    });
+    await rollupDay(makeEnv(), DAY);
+    const rows = await counts();
+    const get = (ci: string, measure: string) =>
+      rows.find((r) => r.ci === ci && r.dim === "event" && r.value === "config" && r.measure === measure)?.n;
+    expect(get("0", "raw")).toBe(5);
+    expect(get("1", "raw")).toBe(40);
+    expect(get("1", "debounced_1h")).toBe(9);
+    expect(get("1", "quarantined")).toBe(7);
+    expect(get("0", "quarantined")).toBeUndefined();
+    const again = await rollupDay(makeEnv(), DAY);
+    expect(again).toBe(45);
+    expect(await counts()).toEqual(rows);
   });
 
   it("excludes quarantined rows from the measures", async () => {
