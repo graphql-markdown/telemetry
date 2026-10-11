@@ -40,6 +40,16 @@ resource "cloudflare_workers_script" "telemetry" {
       }
     },
     {
+      # 2000 events per 60 s per colo, independent of the payload.
+      name         = "RL_COLO"
+      type         = "ratelimit"
+      namespace_id = "1003"
+      simple = {
+        limit  = 2000
+        period = 60
+      }
+    },
+    {
       # Quota-protection ceiling: 1000 events per 60 s per (fp, colo).
       name         = "RL_HARD"
       type         = "ratelimit"

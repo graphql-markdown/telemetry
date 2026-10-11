@@ -25,6 +25,12 @@
       "simple": { "limit": 100, "period": 60 }
     },
     {
+      // Per colo only (key `colo:${colo}`), checked before parsing the body.
+      "name": "RL_COLO",
+      "namespace_id": "1003",
+      "simple": { "limit": 2000, "period": 60 }
+    },
+    {
       "name": "RL_HARD",
       "namespace_id": "1002",
       "simple": { "limit": 1000, "period": 60 }

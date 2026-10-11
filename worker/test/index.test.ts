@@ -296,3 +296,38 @@ describe("anti-abuse", () => {
     expect(rejects.writeDataPoint.mock.calls[0][0].blobs).toEqual(["rate-limit"]);
   });
 });
+
+describe("per-colo limit", () => {
+  it("caps many distinct fps from one colo before parsing", async () => {
+    let seen = 0;
+    const RL_COLO = {
+      limit: vi.fn(async (_options: { key: string }) => {
+        seen += 1;
+        return { success: seen <= 5 };
+      }),
+    };
+    const { env, events, rejects } = mockEnv({ RL_COLO } as Partial<Env>);
+    const statuses: number[] = [];
+    for (let i = 0; i < 20; i += 1) {
+      const res = await worker.fetch(
+        post(JSON.stringify(payload({ pkgVersion: `1.0.${i}` })), JSON_HEADERS, { cf: { colo: "LHR" } }),
+        env,
+      );
+      statuses.push(res.status);
+    }
+    expect(statuses.filter((s) => s === 202)).toHaveLength(5);
+    expect(events.writeDataPoint).toHaveBeenCalledTimes(5);
+    expect(RL_COLO.limit).toHaveBeenCalledWith({ key: "colo:LHR" });
+    expect(rejects.writeDataPoint).toHaveBeenCalledTimes(15);
+    expect(rejects.writeDataPoint.mock.calls[0][0].blobs).toEqual(["rate-limit-colo"]);
+  });
+
+  it("rejects over the limit even for an unparseable body", async () => {
+    const { env, rejects } = mockEnv({
+      RL_COLO: { limit: async () => ({ success: false }) },
+    } as Partial<Env>);
+    const res = await worker.fetch(post("{nope", JSON_HEADERS), env);
+    expect(res.status).toBe(204);
+    expect(rejects.writeDataPoint.mock.calls[0][0].blobs).toEqual(["rate-limit-colo"]);
+  });
+});

@@ -6,6 +6,8 @@ export interface Env {
   REJECTS: AnalyticsEngineDataset;
   /** Rate limit per `(fp, colo)`: 100 per 60 s. Tripping it starts a quarantine. */
   RL?: RateLimit;
+  /** Per-colo limit, independent of the payload: 2000 per 60 s, checked before parsing. */
+  RL_COLO?: RateLimit;
   /** Hard-drop ceiling per `(fp, colo)`: 1000 per 60 s. */
   RL_HARD?: RateLimit;
   /** Comma-separated retired payload versions (answered with 410). Empty by default. */
@@ -17,4 +19,5 @@ export type RejectReason =
   | "schema-version"
   | "size"
   | "encoding"
-  | "rate-limit";
+  | "rate-limit"
+  | "rate-limit-colo";

@@ -77,7 +77,7 @@ const checkAbuse = async (
   env: Env,
   fp: string,
 ): Promise<"drop" | "quarantined" | "ok"> => {
-  const colo = (request as { cf?: { colo?: string } }).cf?.colo ?? "x";
+  const colo = coloOf(request);
   const key = `${fp}:${colo}`;
   if (env.RL_HARD && !(await env.RL_HARD.limit({ key })).success) {
     return "drop";
@@ -98,7 +98,19 @@ const checkAbuse = async (
   return quarantined ? "quarantined" : "ok";
 };
 
+const coloOf = (request: Request): string => {
+  return (request as { cf?: { colo?: string } }).cf?.colo ?? "x";
+};
+
 const ingest = async (request: Request, env: Env): Promise<Response> => {
+  // Cheap flood check before any body work. Independent of the payload, so
+  // varying a field to get a new fp cannot bypass it. Key: colo only.
+  if (
+    env.RL_COLO &&
+    !(await env.RL_COLO.limit({ key: `colo:${coloOf(request)}` })).success
+  ) {
+    return reject(env, "rate-limit-colo");
+  }
   const type = (request.headers.get("content-type") ?? "").toLowerCase();
   if (!type.startsWith("application/json")) {
     return reject(env, "schema");
