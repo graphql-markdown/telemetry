@@ -67,20 +67,36 @@ const quarantineRequest = (fp: string, colo: string): Request => {
   return new Request(`https://quarantine.invalid/quarantine:${fp}:${colo}`);
 };
 
+/** Sampling denominators when a flood ceiling trips. */
+export const SAMPLE_HARD = 20;
+export const SAMPLE_COLO = 50;
+
+/** True with probability 1/n. */
+const keepOneIn = (n: number): boolean => {
+  const buffer = new Uint32Array(1);
+  crypto.getRandomValues(buffer);
+  return buffer[0] % n === 0;
+};
+
 /**
  * Anti-abuse for one `(fp, colo)`. `colo` is used in memory and in the cache
- * key only, never stored. Returns "drop" above the hard ceiling, otherwise
- * whether the event is quarantined (an active entry, or the limit just tripped).
+ * key only, never stored. Above the hard ceiling the event is sampled, never
+ * dropped outright: kept with probability 1/SAMPLE_HARD and weighted
+ * accordingly (null when sampled out). Quarantine only sets a flag.
  */
 const checkAbuse = async (
   request: Request,
   env: Env,
   fp: string,
-): Promise<"drop" | "quarantined" | "ok"> => {
+): Promise<{ quarantined: boolean; weight: number } | null> => {
   const colo = coloOf(request);
   const key = `${fp}:${colo}`;
+  let flooded = false;
   if (env.RL_HARD && !(await env.RL_HARD.limit({ key })).success) {
-    return "drop";
+    if (!keepOneIn(SAMPLE_HARD)) {
+      return null;
+    }
+    flooded = true;
   }
   const cache = caches.default;
   const entry = quarantineRequest(fp, colo);
@@ -95,7 +111,10 @@ const checkAbuse = async (
       }),
     );
   }
-  return quarantined ? "quarantined" : "ok";
+  return {
+    quarantined: quarantined || flooded,
+    weight: flooded ? SAMPLE_HARD : 1,
+  };
 };
 
 const coloOf = (request: Request): string => {
@@ -103,13 +122,18 @@ const coloOf = (request: Request): string => {
 };
 
 const ingest = async (request: Request, env: Env): Promise<Response> => {
+  let coloWeight = 1;
   // Cheap flood check before any body work. Independent of the payload, so
   // varying a field to get a new fp cannot bypass it. Key: colo only.
   if (
     env.RL_COLO &&
     !(await env.RL_COLO.limit({ key: `colo:${coloOf(request)}` })).success
   ) {
-    return reject(env, "rate-limit-colo");
+    // Sample instead of dropping, so a flood can't silence real traffic.
+    if (!keepOneIn(SAMPLE_COLO)) {
+      return reject(env, "sampled-out");
+    }
+    coloWeight = SAMPLE_COLO;
   }
   const type = (request.headers.get("content-type") ?? "").toLowerCase();
   if (!type.startsWith("application/json")) {
@@ -138,13 +162,15 @@ const ingest = async (request: Request, env: Env): Promise<Response> => {
   }
   const { fp, fpShape } = await fingerprints(result.value);
   const abuse = await checkAbuse(request, env, fp);
-  if (abuse === "drop") {
-    return reject(env, "rate-limit");
+  if (abuse === null) {
+    return reject(env, "sampled-out");
   }
   env.EVENTS.writeDataPoint({
     indexes: [fp],
-    blobs: buildBlobs(result.value, fp, fpShape, abuse === "quarantined"),
-    doubles: [1],
+    blobs: buildBlobs(result.value, fp, fpShape, abuse.quarantined || coloWeight > 1),
+    // Weight: 1 normally, N when kept under 1/N sampling. Queries must use
+    // SUM(_sample_interval * double1), never count().
+    doubles: [abuse.weight * coloWeight],
   });
   return new Response(null, { status: 202 });
 };

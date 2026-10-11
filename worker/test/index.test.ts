@@ -285,49 +285,63 @@ describe("anti-abuse", () => {
     expect(quarantinedBlob(other.events)).toBe("0");
   });
 
-  it("hard-drops above the ceiling with a rate-limit reject", async () => {
+  it("samples 1 in 20 above the hard ceiling, weighted, never a full drop", async () => {
     const { env, events, rejects } = mockEnv({
       RL: limiter(true),
       RL_HARD: limiter(false),
     } as Partial<Env>);
-    const res = await send(env, { config: { schema: "<path>", id: "<string>", force: true } });
-    expect(res.status).toBe(204);
-    expect(events.writeDataPoint).not.toHaveBeenCalled();
-    expect(rejects.writeDataPoint.mock.calls[0][0].blobs).toEqual(["rate-limit"]);
+    const total = 2000;
+    for (let i = 0; i < total; i += 1) {
+      const res = await send(env, { config: { schema: "<path>", id: "<string>", force: true } });
+      expect([202, 204]).toContain(res.status);
+    }
+    const kept = events.writeDataPoint.mock.calls.length;
+    expect(kept).toBeGreaterThan(total / 20 / 2);
+    expect(kept).toBeLessThan((total / 20) * 2);
+    for (const [point] of events.writeDataPoint.mock.calls) {
+      expect(point.doubles).toEqual([20]);
+      expect(point.blobs[16]).toBe("1");
+    }
+    expect(rejects.writeDataPoint).toHaveBeenCalledTimes(total - kept);
+    expect(rejects.writeDataPoint.mock.calls[0][0].blobs).toEqual(["sampled-out"]);
+  });
+
+  it("keeps weight 1 for normal traffic", async () => {
+    const { env, events } = mockEnv({ RL: limiter(true), RL_HARD: limiter(true), RL_COLO: limiter(true) } as Partial<Env>);
+    await send(env, { config: { schema: "<path>", id: "<string>", diffMethod: "NONE" } });
+    expect(events.writeDataPoint.mock.calls[0][0].doubles).toEqual([1]);
+    expect(quarantinedBlob(events)).toBe("0");
+  });
+
+  it("still writes a legitimate event from a quarantined colo, flagged, weight 1", async () => {
+    const { env, events } = mockEnv({ RL: limiter(false), RL_HARD: limiter(true), RL_COLO: limiter(true) } as Partial<Env>);
+    const res = await send(env, { config: { schema: "<path>", id: "<string>", homepage: "<path>" } }, "ORD");
+    expect(res.status).toBe(202);
+    expect(quarantinedBlob(events)).toBe("1");
+    expect(events.writeDataPoint.mock.calls[0][0].doubles).toEqual([1]);
   });
 });
 
 describe("per-colo limit", () => {
-  it("caps many distinct fps from one colo before parsing", async () => {
-    let seen = 0;
-    const RL_COLO = {
-      limit: vi.fn(async (_options: { key: string }) => {
-        seen += 1;
-        return { success: seen <= 5 };
-      }),
-    };
+  it("samples 1 in 50 when many distinct fps flood one colo", async () => {
+    const RL_COLO = { limit: vi.fn(async (_options: { key: string }) => ({ success: false })) };
     const { env, events, rejects } = mockEnv({ RL_COLO } as Partial<Env>);
-    const statuses: number[] = [];
-    for (let i = 0; i < 20; i += 1) {
-      const res = await worker.fetch(
+    const total = 5000;
+    for (let i = 0; i < total; i += 1) {
+      await worker.fetch(
         post(JSON.stringify(payload({ pkgVersion: `1.0.${i}` })), JSON_HEADERS, { cf: { colo: "LHR" } }),
         env,
       );
-      statuses.push(res.status);
     }
-    expect(statuses.filter((s) => s === 202)).toHaveLength(5);
-    expect(events.writeDataPoint).toHaveBeenCalledTimes(5);
+    const kept = events.writeDataPoint.mock.calls.length;
+    expect(kept).toBeGreaterThan(total / 50 / 2.5);
+    expect(kept).toBeLessThan((total / 50) * 2.5);
     expect(RL_COLO.limit).toHaveBeenCalledWith({ key: "colo:LHR" });
-    expect(rejects.writeDataPoint).toHaveBeenCalledTimes(15);
-    expect(rejects.writeDataPoint.mock.calls[0][0].blobs).toEqual(["rate-limit-colo"]);
-  });
-
-  it("rejects over the limit even for an unparseable body", async () => {
-    const { env, rejects } = mockEnv({
-      RL_COLO: { limit: async () => ({ success: false }) },
-    } as Partial<Env>);
-    const res = await worker.fetch(post("{nope", JSON_HEADERS), env);
-    expect(res.status).toBe(204);
-    expect(rejects.writeDataPoint.mock.calls[0][0].blobs).toEqual(["rate-limit-colo"]);
+    for (const [point] of events.writeDataPoint.mock.calls) {
+      expect(point.doubles).toEqual([50]);
+      expect(point.blobs[16]).toBe("1");
+    }
+    expect(rejects.writeDataPoint).toHaveBeenCalledTimes(total - kept);
+    expect(rejects.writeDataPoint.mock.calls[0][0].blobs).toEqual(["sampled-out"]);
   });
 });

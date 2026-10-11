@@ -20,4 +20,5 @@ export type RejectReason =
   | "size"
   | "encoding"
   | "rate-limit"
-  | "rate-limit-colo";
+  | "rate-limit-colo"
+  | "sampled-out";
