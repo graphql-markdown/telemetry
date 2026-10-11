@@ -72,7 +72,7 @@ describe("validate: accepted payloads", () => {
   });
 
   it("accepts numbers and booleans inside config", () => {
-    expect(validate(withConfig({ depth: 3, flag: false })).ok).toBe(true);
+    expect(validate(withConfig({ force: false, printTypeOptions: { parentTypePrefix: true } })).ok).toBe(true);
   });
 });
 
@@ -192,5 +192,33 @@ describe("validate: leaking payloads", () => {
       nested = { a: nested };
     }
     expect(validate(withConfig(nested)).ok).toBe(false);
+  });
+});
+
+describe("validate: key allowlist", () => {
+  it.each([
+    ["directive-like key", { "@deprecated": "<string>" }],
+    ["arbitrary key", { myCompanySecret: true }],
+    ["unknown nested key", { printTypeOptions: { internalHost: true } }],
+    ["cli-only key in config", { diff: "NONE" }],
+    ["named key inside a map", { metatags: [{ robots: "<string>" }] }],
+    ["unknown key inside groupByDirective", { groupByDirective: { x: "<string>" } }],
+  ])("rejects %s in config", (_name, config) => {
+    expect(validate(withConfig(config))).toEqual({ ok: false, reason: "schema" });
+  });
+
+  it("rejects an arbitrary key in cli", () => {
+    expect(validate({ ...base(), cli: { myFlag: true } })).toEqual({
+      ok: false,
+      reason: "schema",
+    });
+  });
+
+  it("accepts known option names, key tokens and loader names", () => {
+    const config = {
+      docOptions: { index: true, frontMatter: { "<key:0>": "<string>" } },
+      loaders: { GitLoader: { module: "@graphql-tools/git-loader", options: {} } },
+    };
+    expect(validate(withConfig(config))).toMatchObject({ ok: true });
   });
 });

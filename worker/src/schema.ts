@@ -148,8 +148,6 @@ export const UNKNOWN_VALUE = "unknown-value";
 const SEMVER = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
 const FORMATTER_PACKAGE = new RegExp(ALLOWLIST.formatterPackagePattern);
 const KEY_TOKEN = new RegExp(ALLOWLIST.keyTokenPattern);
-/** Plain option names such as `rootPath` (no path, URL or host characters). */
-const OPTION_KEY = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 const MAX_DEPTH = 8;
 
 /** Every string that may appear as a value inside `config` and `cli`. */
@@ -165,7 +163,88 @@ const VALUE_STRINGS = new Set<string>([
   ...KNOWN_LOADERS,
   ...MASK_TOKENS,
 ]);
-const KNOWN_LOADER_SET = new Set<string>(KNOWN_LOADERS);
+
+/**
+ * Option names, vendored from the client rule tables (CONFIG_RULES and
+ * CLI_RULES in packages/telemetry/src/sanitize.ts).
+ */
+export const CONFIG_KEYS: ReadonlySet<string> = new Set([
+  "baseURL",
+  "customDirective",
+  "decorators",
+  "diffMethod",
+  "docOptions",
+  "force",
+  "groupByDirective",
+  "homepage",
+  "id",
+  "linkRoot",
+  "loaders",
+  "formatter",
+  "mdxParser",
+  "metatags",
+  "onlyDocDirective",
+  "outputAdapter",
+  "pretty",
+  "printTypeOptions",
+  "rootPath",
+  "schema",
+  "skipDocDirective",
+  "telemetry",
+  "tmpDir",
+]);
+export const CLI_KEYS: ReadonlySet<string> = new Set([
+  "base",
+  "config",
+  "deprecated",
+  "diff",
+  "force",
+  "groupByDirective",
+  "homepage",
+  "index",
+  "link",
+  "hierarchy",
+  "formatter",
+  "mdxParser",
+  "noParentType",
+  "noTypeBadges",
+  "noSectionId",
+  "pretty",
+  "root",
+  "schema",
+  "skip",
+  "only",
+  "tmp",
+  "telemetry",
+]);
+
+const NO_NAMES: ReadonlySet<string> = new Set();
+/** Loader entries are `{ [loaderName]: { module, options } }`. */
+const LOADER_NAMES: ReadonlySet<string> = new Set([
+  ...KNOWN_LOADERS,
+  "module",
+  "options",
+]);
+/** Known field names of nested objects (config only). */
+const NESTED_NAMES: Record<string, ReadonlySet<string>> = {
+  printTypeOptions: new Set([
+    "deprecated",
+    "exampleSection",
+    "hierarchy",
+    "parentTypePrefix",
+    "typeBadges",
+  ]),
+  docOptions: new Set([
+    "frontMatter",
+    "index",
+    "generatorFrameworkName",
+    "generatorFrameworkVersion",
+    "categorySort",
+    "sectionHeaderId",
+  ]),
+  groupByDirective: new Set(["directive", "field", "fallback"]),
+  loaders: LOADER_NAMES,
+};
 
 export type ValidationFailure = "schema" | "schema-version";
 export type ValidationResult =
@@ -201,7 +280,15 @@ const enumValue = (
   return allowed.includes(value) ? value : UNKNOWN_VALUE;
 };
 
-const sanitizeSection = (value: unknown, depth: number): Checked<unknown> => {
+/**
+ * `names` are the option names allowed as keys at this object level; `<key:n>`
+ * tokens are always allowed. Below the top level only loaders keep names.
+ */
+const sanitizeSection = (
+  value: unknown,
+  depth: number,
+  names: ReadonlySet<string>,
+): Checked<unknown> => {
   if (depth > MAX_DEPTH) {
     return FAIL;
   }
@@ -219,7 +306,7 @@ const sanitizeSection = (value: unknown, depth: number): Checked<unknown> => {
   if (Array.isArray(value)) {
     const out: unknown[] = [];
     for (const item of value) {
-      const checked = sanitizeSection(item, depth + 1);
+      const checked = sanitizeSection(item, depth + 1, names);
       if (checked === FAIL) {
         return FAIL;
       }
@@ -230,14 +317,16 @@ const sanitizeSection = (value: unknown, depth: number): Checked<unknown> => {
   if (isObject(value)) {
     const out: Json = {};
     for (const [key, item] of Object.entries(value)) {
-      if (
-        !KEY_TOKEN.test(key) &&
-        !OPTION_KEY.test(key) &&
-        !KNOWN_LOADER_SET.has(key)
-      ) {
+      if (!KEY_TOKEN.test(key) && !names.has(key)) {
         return FAIL;
       }
-      const checked = sanitizeSection(item, depth + 1);
+      const childNames =
+        depth === 0
+          ? (NESTED_NAMES[key] ?? NO_NAMES)
+          : names === LOADER_NAMES
+            ? LOADER_NAMES
+            : NO_NAMES;
+      const checked = sanitizeSection(item, depth + 1, childNames);
       if (checked === FAIL) {
         return FAIL;
       }
@@ -366,7 +455,11 @@ export const validate = (payload: unknown): ValidationResult => {
     if (!isObject(payload[section])) {
       return fail("schema");
     }
-    const checked = sanitizeSection(payload[section], 0);
+    const checked = sanitizeSection(
+      payload[section],
+      0,
+      section === "config" ? CONFIG_KEYS : CLI_KEYS,
+    );
     if (checked === FAIL) {
       return fail("schema");
     }
