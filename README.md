@@ -33,7 +33,7 @@ No personal data is collected or stored: there are no identifiers, and no IP add
 These hold in every change. Review them before merging anything that touches `worker/`.
 
 - The Worker never reads, logs, hashes or stores the IP address, the User-Agent, or any request header except `Content-Type`, `Content-Encoding` and `Content-Length`.
-- The only other header read is the Access JWT, and only on `/v1/stats`. `request.cf.colo` is used in memory for rate limits and the quarantine key, and is never stored.
+- The only other header read is the Access JWT, and only on `/v1/stats`. `request.cf.colo` is used in memory for rate limits and the quarantine key (KV, 1 h TTL), and is never stored.
 - No `console.log` of request data. `observability.enabled` is `false` in `worker/wrangler.jsonc`.
 - Only allowlisted payload fields are stored (`worker/src/schema.ts`). Reject counters carry the reason only.
 - The dashboard and public pages send a strict Content-Security-Policy (`default-src 'self'`, no inline script or style, `frame-ancestors 'none'`) and `Referrer-Policy: no-referrer`. uPlot is self-hosted in `dashboard/vendor/`.
@@ -95,6 +95,7 @@ Create a token at Cloudflare dashboard > My Profile > API Tokens, with these per
 | --- | --- |
 | Account | Workers Scripts: Edit |
 | Account | D1: Edit |
+| Account | Workers KV Storage: Edit |
 | Account | Workers R2 Storage: Edit |
 | Account | Access: Apps and Policies: Edit |
 | Account | Account Analytics: Read |
@@ -151,7 +152,7 @@ tofu init -backend-config="endpoints={s3=\"https://<account id>.r2.cloudflaresto
 tofu apply
 ```
 
-This creates the D1 database, the Worker with its secrets and vars (`ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`, `PUBLIC_STATS`), the custom domain and the Access application. `PUBLIC_STATS` is owned by tofu (`public_stats`, default `"false"`); `keep_vars` stops `wrangler deploy` from resetting it.
+This creates the D1 database, the quarantine KV namespace, the Worker with its secrets and vars (`ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`, `PUBLIC_STATS`), the custom domain and the Access application. `PUBLIC_STATS` is owned by tofu (`public_stats`, default `"false"`); `keep_vars` stops `wrangler deploy` from resetting it.
 
 ### 6. Deploy the Worker and migrations
 
@@ -161,7 +162,7 @@ export CLOUDFLARE_ACCOUNT_ID=<account id>
 scripts/deploy.sh
 ```
 
-The script reads `d1_database_id` from the tofu output, writes a temporary copy of `worker/wrangler.jsonc` with the real id, runs `wrangler deploy` and `wrangler d1 migrations apply gqlmd-telemetry --remote`, then deletes the copy. It needs `tofu` initialised in `infra/`. Run it again after each Worker change or new file in `migrations/`.
+The script reads `d1_database_id` and `quarantine_kv_id` from the tofu output, writes a temporary copy of `worker/wrangler.jsonc` with the real D1 and KV ids, runs `wrangler deploy` and `wrangler d1 migrations apply gqlmd-telemetry --remote`, then deletes the copy. It needs `tofu` initialised in `infra/`. Run it again after each Worker change or new file in `migrations/`.
 
 ### 7. Verify
 

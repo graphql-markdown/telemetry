@@ -13,6 +13,11 @@ if [[ -z "$db_id" ]]; then
   echo "error: 'tofu output d1_database_id' is empty; run 'tofu apply' in infra/ first" >&2
   exit 1
 fi
+kv_id="$(tofu -chdir="$root/infra" output -raw quarantine_kv_id)"
+if [[ -z "$kv_id" ]]; then
+  echo "error: 'tofu output quarantine_kv_id' is empty; run 'tofu apply' in infra/ first" >&2
+  exit 1
+fi
 
 # Created next to wrangler.jsonc so its relative paths (main, assets, migrations) still resolve.
 tmp="$(mktemp "$root/worker/wrangler.deploy.XXXXXX")"
@@ -20,9 +25,10 @@ trap 'rm -f "$tmp" "$tmp.jsonc"' EXIT
 mv "$tmp" "$tmp.jsonc"
 tmp="$tmp.jsonc"
 
-sed "s/00000000-0000-0000-0000-000000000000/$db_id/" "$root/worker/wrangler.jsonc" > "$tmp"
-if ! grep -q "$db_id" "$tmp"; then
-  echo "error: placeholder database_id not found in worker/wrangler.jsonc" >&2
+sed -e "s/00000000-0000-0000-0000-000000000000/$db_id/" \
+  -e "s/00000000000000000000000000000001/$kv_id/" "$root/worker/wrangler.jsonc" > "$tmp"
+if ! grep -q "$db_id" "$tmp" || ! grep -q "$kv_id" "$tmp"; then
+  echo "error: placeholder database_id or KV id not found in worker/wrangler.jsonc" >&2
   exit 1
 fi
 

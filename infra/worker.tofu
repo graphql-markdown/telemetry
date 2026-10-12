@@ -10,6 +10,12 @@ resource "cloudflare_d1_database" "telemetry" {
   name       = local.worker_name
 }
 
+# Quarantine flags (the Cache API does not work on workers.dev).
+resource "cloudflare_workers_kv_namespace" "quarantine" {
+  account_id = var.account_id
+  title      = "${local.worker_name}-quarantine"
+}
+
 resource "cloudflare_workers_script" "telemetry" {
   account_id  = var.account_id
   script_name = local.worker_name
@@ -72,6 +78,11 @@ resource "cloudflare_workers_script" "telemetry" {
       name = "DB"
       type = "d1"
       id   = cloudflare_d1_database.telemetry.id
+    },
+    {
+      name         = "QUARANTINE"
+      type         = "kv_namespace"
+      namespace_id = cloudflare_workers_kv_namespace.quarantine.id
     },
     {
       name = "AE_SQL_TOKEN"

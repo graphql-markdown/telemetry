@@ -77,6 +77,15 @@ run "custom_domain" {
   }
 }
 
+run "quarantine_kv" {
+  command = plan
+
+  assert {
+    condition     = [for b in cloudflare_workers_script.telemetry.bindings : b.type if b.name == "QUARANTINE"][0] == "kv_namespace"
+    error_message = "QUARANTINE must be a kv_namespace binding" # verify: v5 kv_namespace binding attribute names
+  }
+}
+
 run "cron" {
   command = plan
 
