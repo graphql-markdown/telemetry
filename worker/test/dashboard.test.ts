@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import app from "../../dashboard/app.js?raw";
 import html from "../../dashboard/index.html?raw";
-import publicHtml from "../../dashboard/public.html?raw";
+import publicHtml from "../../public/public.html?raw";
 import vendorReadme from "../../dashboard/vendor/README.md?raw";
 
 describe("dashboard assets", () => {

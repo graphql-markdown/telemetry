@@ -1,5 +1,10 @@
 /** Worker bindings (see worker/wrangler.jsonc). */
 export interface Env {
+  /**
+   * Which routes this deployment serves: `"ingest"` (/v1/event, /public*, cron) or
+   * `"dashboard"` (/v1/stats*, assets). Unset (local dev, tests) serves everything.
+   */
+  ROLE?: "ingest" | "dashboard";
   /** Analytics Engine dataset `gqlmd_events`: one data point per accepted event. */
   EVENTS: AnalyticsEngineDataset;
   /** Analytics Engine dataset `gqlmd_rejects`: reject counters, no payload fields. */

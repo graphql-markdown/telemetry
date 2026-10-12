@@ -277,10 +277,21 @@ const secured = (res: Response): Response => {
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 };
 
+/**
+ * One bundle, two Workers (see wrangler.jsonc and wrangler.dashboard.jsonc).
+ * A route outside the Worker's role is a plain 404. When ROLE is unset (local
+ * `wrangler dev`, tests) every route is served.
+ */
+const serves = (env: Env, role: "ingest" | "dashboard"): boolean =>
+  env.ROLE === undefined || env.ROLE === role;
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === "/v1/stats" || url.pathname.startsWith("/v1/stats/")) {
+      if (!serves(env, "dashboard")) {
+        return new Response("Not Found", { status: 404 });
+      }
       if (request.method !== "GET") {
         return secured(
           new Response("Method Not Allowed", {
@@ -295,6 +306,9 @@ export default {
       return secured(await handleStats(url, env));
     }
     if (url.pathname === "/public" || url.pathname.startsWith("/public/")) {
+      if (!serves(env, "ingest")) {
+        return new Response("Not Found", { status: 404 });
+      }
       if (request.method !== "GET") {
         return secured(
           new Response("Method Not Allowed", {
@@ -305,7 +319,7 @@ export default {
       }
       return secured(await handlePublic(url, env));
     }
-    if (url.pathname !== "/v1/event") {
+    if (url.pathname !== "/v1/event" || !serves(env, "ingest")) {
       return new Response("Not Found", { status: 404 });
     }
     if (request.method !== "POST") {
@@ -318,6 +332,9 @@ export default {
   },
   /** Daily cron (0 2 * * *): roll up day D-1 (UTC) into D1, alert on zero config events. */
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    if (!serves(env, "ingest")) {
+      return;
+    }
     const day = previousDay(controller.scheduledTime);
     const configEvents = await rollupDay(env, day);
     if (configEvents === 0) {
