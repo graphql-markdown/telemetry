@@ -10,10 +10,13 @@ on:
   push:
     branches:
       - main
+  # Deploy is manual: run the workflow from main in the Actions tab.
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a run on main: a deploy may be halfway through `tofu apply`.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -81,11 +84,93 @@ jobs:
           tofu validate
           tofu test
 
-  # There is no apply job yet. When it exists, run after `tofu apply` and
-  # before the Worker is used:
-  #   - name: Apply D1 migrations
-  #     run: bunx wrangler d1 migrations apply gqlmd-telemetry --remote --config worker/wrangler.jsonc
-  #     env:
-  #       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-  #       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-  #       TF_VAR_ae_sql_token: ${{ secrets.AE_SQL_TOKEN }}
+  # Manual only (workflow_dispatch on main). The plan is printed to the job
+  # summary and the apply uses that saved plan, nothing re-planned.
+  # Required reviewers on the `production` environment add an approval before the job starts.
+  deploy:
+    name: Deploy
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: [worker, opentofu]
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    # Secrets are set per step, never job-wide, so `bun install` and the build never see them.
+    env:
+      TF_IN_AUTOMATION: "1"
+      TF_INPUT: "0"
+    steps:
+      - name: Checkout Code Base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # infra/worker.tofu reads the bundle, and scripts/deploy.sh runs the pinned wrangler.
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Build Worker bundle
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@9d84900f3238fab8cd84ce47d658d25dd008be2f # v1.0.8
+        with:
+          tofu_version_file: .opentofu-version
+          tofu_wrapper: false
+
+      - name: Init
+        working-directory: infra
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TF_VAR_state_passphrase: ${{ secrets.TOFU_STATE_PASSPHRASE }}
+        run: tofu init -backend-config="endpoints={s3=\"https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com\"}"
+
+      # The summary lists resource addresses and actions only, never attribute values
+      # (the repository is public).
+      - name: Plan
+        working-directory: infra
+        env: &tofu-env
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_state_passphrase: ${{ secrets.TOFU_STATE_PASSPHRASE }}
+          TF_VAR_ae_sql_token: ${{ secrets.AE_SQL_TOKEN }}
+          TF_VAR_alert_webhook: ${{ secrets.ALERT_WEBHOOK }}
+          TF_VAR_workers_subdomain: ${{ vars.WORKERS_SUBDOMAIN }}
+          TF_VAR_access_team_domain: ${{ vars.ACCESS_TEAM_DOMAIN }}
+          TF_VAR_access_aud: ${{ vars.ACCESS_AUD }}
+          TF_VAR_dashboard_emails: ${{ secrets.DASHBOARD_EMAILS }}
+        run: |
+          tofu plan -out=tfplan
+          {
+            echo '### OpenTofu plan'
+            echo
+            tofu show -json tfplan | jq -r '
+              [.resource_changes[] | select(.change.actions != ["no-op"])]
+              | if length == 0 then "No changes."
+                else (["| Resource | Actions |", "| --- | --- |"]
+                  + map("| `\(.address)` | \(.change.actions | join(", ")) |"))
+                  | join("\n")
+                end'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply
+        working-directory: infra
+        env: *tofu-env
+        run: tofu apply tfplan
+
+      # Deploys both Workers with the real D1/KV ids, then applies D1 migrations once.
+      - name: Deploy Workers and migrations
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_state_passphrase: ${{ secrets.TOFU_STATE_PASSPHRASE }}
+        run: scripts/deploy.sh

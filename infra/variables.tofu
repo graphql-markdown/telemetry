@@ -46,6 +46,8 @@ variable "alert_webhook" {
 variable "dashboard_emails" {
   description = "Email addresses allowed to open the dashboard (one-time PIN login)."
   type        = list(string)
+  # Kept out of plan output and CI logs (the repository is public).
+  sensitive = true
 
   validation {
     condition     = length(var.dashboard_emails) > 0
@@ -56,6 +58,11 @@ variable "dashboard_emails" {
 variable "access_team_domain" {
   description = "Zero Trust team domain, e.g. myteam.cloudflareaccess.com (JWKS host and JWT issuer)."
   type        = string
+
+  validation {
+    condition     = can(regex("^[a-z0-9-]+\\.cloudflareaccess\\.com$", var.access_team_domain))
+    error_message = "access_team_domain is the full team host (e.g. \"myteam.cloudflareaccess.com\"), not the bare team name or a URL."
+  }
 }
 
 variable "access_aud" {
