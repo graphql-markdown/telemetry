@@ -86,6 +86,7 @@ beforeEach(async () => {
     db.prepare("DELETE FROM daily_counts"),
     db.prepare("DELETE FROM config_catalog"),
     db.prepare("DELETE FROM rejects_daily"),
+    db.prepare("DELETE FROM config_catalog_daily"),
   ]);
 });
 
@@ -215,6 +216,34 @@ describe("rollupDay", () => {
     expect(await counts()).toEqual(first.counts);
     expect((await db.prepare("SELECT * FROM config_catalog").all()).results).toEqual(first.catalog);
     expect((await db.prepare("SELECT * FROM rejects_daily").all()).results).toEqual(first.rejects);
+  });
+
+  it("records per-day catalog counts per shape and ci, idempotently", async () => {
+    mockAe({
+      catalog: [
+        { fp_shape: "s1", ci: "0", version: "1.0.0", config: "{}", events: 20, debounced: 6 },
+        { fp_shape: "s1", ci: "0", version: "1.1.0", config: "{}", events: 10, debounced: 4 },
+        { fp_shape: "s1", ci: "1", version: "1.0.0", config: "{}", events: 7, debounced: 2 },
+        { fp_shape: "s2", ci: "0", version: "1.0.0", config: "{}", events: 3, debounced: 1 },
+      ],
+    });
+    const daily = async () =>
+      (
+        await db
+          .prepare("SELECT * FROM config_catalog_daily ORDER BY day, fp_shape, ci")
+          .all()
+      ).results;
+    await rollupDay(makeEnv(), DAY);
+    const first = await daily();
+    expect(first).toEqual([
+      { day: DAY, fp_shape: "s1", ci: "0", events: 30, debounced_events: 10 },
+      { day: DAY, fp_shape: "s1", ci: "1", events: 7, debounced_events: 2 },
+      { day: DAY, fp_shape: "s2", ci: "0", events: 3, debounced_events: 1 },
+    ]);
+    const catalogSql = sqls.find((q) => q.includes("AS fp_shape")) ?? "";
+    expect(catalogSql).toContain("blob17 = '0'");
+    await rollupDay(makeEnv(), DAY);
+    expect(await daily()).toEqual(first);
   });
 
   it("adds the catalog across days", async () => {

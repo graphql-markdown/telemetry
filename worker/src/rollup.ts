@@ -69,11 +69,11 @@ const quarantinedSql = (day: string): string => {
 
 const catalogSql = (day: string): string => {
   return (
-    `SELECT blob3 AS fp_shape, blob5 AS version, blob18 AS config, ` +
+    `SELECT blob3 AS fp_shape, blob12 AS ci, blob5 AS version, blob18 AS config, ` +
     `SUM(_sample_interval * double1) AS events, ` +
     `count(DISTINCT (blob2, toStartOfHour(timestamp))) AS debounced ` +
     `FROM gqlmd_events WHERE ${dayWindow(day)} AND ${CLEAN} ` +
-    `AND blob1 = 'config' GROUP BY fp_shape, version, config`
+    `AND blob1 = 'config' GROUP BY fp_shape, ci, version, config`
   );
 };
 
@@ -197,6 +197,7 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
   }
 
   const shapes = new Map<string, Shape>();
+  const dailyShapes = new Map<string, { events: number; debounced: number }>();
   for (const row of await query(env, catalogSql(day))) {
     const id = String(row.fp_shape);
     const shape = shapes.get(id) ?? {
@@ -205,6 +206,11 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
       events: 0,
       debounced: 0,
     };
+    const dailyKey = [id, String(row.ci)].join(KEY_SEP);
+    const daily = dailyShapes.get(dailyKey) ?? { events: 0, debounced: 0 };
+    daily.events += Number(row.events);
+    daily.debounced += Number(row.debounced);
+    dailyShapes.set(dailyKey, daily);
     shape.versions.add(String(row.version));
     shape.events += Number(row.events);
     shape.debounced += Number(row.debounced);
@@ -243,7 +249,21 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
   const statements: D1PreparedStatement[] = [
     db.prepare("DELETE FROM daily_counts WHERE day = ?").bind(day),
     db.prepare("DELETE FROM rejects_daily WHERE day = ?").bind(day),
+    db.prepare("DELETE FROM config_catalog_daily WHERE day = ?").bind(day),
   ];
+  const keptDaily = [...dailyShapes]
+    .sort((a, b) => b[1].events - a[1].events)
+    .slice(0, MAX_ROWS_PER_DAY);
+  for (const [key, daily] of keptDaily) {
+    const [id, ci] = key.split(KEY_SEP);
+    statements.push(
+      db
+        .prepare(
+          "INSERT INTO config_catalog_daily (day, fp_shape, ci, events, debounced_events) VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(day, id, ci, daily.events, daily.debounced),
+    );
+  }
   for (const row of kept) {
     statements.push(
       db

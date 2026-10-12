@@ -54,6 +54,7 @@ export const applyMigrations = async (db: D1Database): Promise<void> => {
   const sql = [
     (await import("../../migrations/0001_init.sql?raw")).default,
     (await import("../../migrations/0002_ci_split.sql?raw")).default,
+    (await import("../../migrations/0003_catalog_daily.sql?raw")).default,
   ].join("\n");
   const statements = sql
     .replace(/^--.*$/gm, "")
