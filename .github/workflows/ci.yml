@@ -49,6 +49,16 @@ jobs:
         with:
           persist-credentials: false
 
+      # worker.tofu reads the bundled Worker with file(),
+      # so the bundle (worker/dist/index.js) must exist before `tofu validate`.
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Build Worker bundle
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
       - name: Setup OpenTofu
         uses: opentofu/setup-opentofu@v1
         with:

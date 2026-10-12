@@ -103,9 +103,10 @@ export const MASK_TOKENS = [
   "<glob>",
   "<inline-sdl>",
   "<unknown>",
+  "<number>",
 ] as const;
 /** Pattern of masked object keys, e.g. `<key:0>`. */
-export const KEY_TOKEN_PATTERN = "^<key:\\d+>$";
+export const KEY_TOKEN_PATTERN = "^<key:\\d{1,6}>$";
 
 export const ALLOWLIST = {
   events: EVENTS,
@@ -145,11 +146,62 @@ export const OS_NAMES = [
 
 export const UNKNOWN_VALUE = "unknown-value";
 
-const SEMVER = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
-const FORMATTER_PACKAGE = new RegExp(ALLOWLIST.formatterPackagePattern);
+/** Exact package names; anything else is never stored. */
+const PACKAGE_NAMES: ReadonlySet<string> = new Set([
+  ...[
+    "cli",
+    "core",
+    "docusaurus",
+    "formatters",
+    "graphql",
+    "helpers",
+    "logger",
+    "printer-legacy",
+    "types",
+    "utils",
+    "diff",
+    "nuxt-theme",
+    "telemetry",
+  ].map((name) => `@graphql-markdown/${name}`),
+  "create-graphql-markdown-docs",
+  ...FORMATTER_PRESETS.map((name) => `@graphql-markdown/formatters/${name}`),
+]);
+const PRE_TAGS = "alpha|beta|rc|canary|next";
+const VERSION_EXACT = new RegExp(
+  `^\\d{1,4}\\.\\d{1,4}\\.\\d{1,4}(-(${PRE_TAGS})\\.\\d{1,3})?$`,
+);
+const VERSION_LOOSE = new RegExp(
+  `^(\\d{1,4}\\.\\d{1,4}\\.\\d{1,4})(?:-(${PRE_TAGS})(?:\\.(\\d{1,3}))?(?![0-9A-Za-z]))?`,
+);
+const MAX_ITEMS = 50;
+const MAX_INT = 1000;
+
+/** Closed-set version: exact, else normalised, else `unknown-value`. */
+const normaliseVersion = (value: unknown): string => {
+  if (typeof value !== "string") {
+    return UNKNOWN_VALUE;
+  }
+  if (VERSION_EXACT.test(value)) {
+    return value;
+  }
+  const match = VERSION_LOOSE.exec(value);
+  if (match === null || (match[2] === undefined && value !== match[1])) {
+    return UNKNOWN_VALUE;
+  }
+  return match[2] === undefined
+    ? match[1]
+    : `${match[1]}-${match[2]}.${match[3] ?? "0"}`;
+};
+
+const inRange = (value: unknown, min: number, max: number): boolean => {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= min &&
+    value <= max
+  );
+};
 const KEY_TOKEN = new RegExp(ALLOWLIST.keyTokenPattern);
-/** Plain option names such as `rootPath` (no path, URL or host characters). */
-const OPTION_KEY = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 const MAX_DEPTH = 8;
 
 /** Every string that may appear as a value inside `config` and `cli`. */
@@ -164,8 +216,91 @@ const VALUE_STRINGS = new Set<string>([
   ...FORMATTER_PRESETS,
   ...KNOWN_LOADERS,
   ...MASK_TOKENS,
+  "natural",
 ]);
-const KNOWN_LOADER_SET = new Set<string>(KNOWN_LOADERS);
+
+/**
+ * Option names, vendored from the client rule tables (CONFIG_RULES and
+ * CLI_RULES in packages/telemetry/src/sanitize.ts).
+ */
+export const CONFIG_KEYS: ReadonlySet<string> = new Set([
+  "baseURL",
+  "customDirective",
+  "decorators",
+  "diffMethod",
+  "docOptions",
+  "force",
+  "groupByDirective",
+  "homepage",
+  "id",
+  "linkRoot",
+  "loaders",
+  "formatter",
+  "mdxParser",
+  "metatags",
+  "onlyDocDirective",
+  "outputAdapter",
+  "pretty",
+  "printTypeOptions",
+  "rootPath",
+  "schema",
+  "skipDocDirective",
+  "telemetry",
+  "tmpDir",
+]);
+export const CLI_KEYS: ReadonlySet<string> = new Set([
+  "base",
+  "config",
+  "deprecated",
+  "diff",
+  "force",
+  "groupByDirective",
+  "homepage",
+  "index",
+  "link",
+  "hierarchy",
+  "formatter",
+  "mdxParser",
+  "noParentType",
+  "noTypeBadges",
+  "noSectionId",
+  "pretty",
+  "root",
+  "schema",
+  "skip",
+  "only",
+  "tmp",
+  "telemetry",
+]);
+
+const NO_NAMES: ReadonlySet<string> = new Set();
+/** Loader entries are `{ [loaderName]: { module, options } }`. */
+const LOADER_NAMES: ReadonlySet<string> = new Set([
+  ...KNOWN_LOADERS,
+  "<custom-loader>",
+  "module",
+  "options",
+]);
+/** Known field names of nested objects (config only). */
+const NESTED_NAMES: Record<string, ReadonlySet<string>> = {
+  printTypeOptions: new Set([
+    "deprecated",
+    "exampleSection",
+    "hierarchy",
+    "parentTypePrefix",
+    "typeBadges",
+  ]),
+  docOptions: new Set([
+    "frontMatter",
+    "index",
+    "generatorFrameworkName",
+    "generatorFrameworkVersion",
+    "categorySort",
+    "sectionHeaderId",
+  ]),
+  groupByDirective: new Set(["directive", "field", "fallback"]),
+  loaders: LOADER_NAMES,
+};
 
 export type ValidationFailure = "schema" | "schema-version";
 export type ValidationResult =
@@ -201,25 +336,39 @@ const enumValue = (
   return allowed.includes(value) ? value : UNKNOWN_VALUE;
 };
 
-const sanitizeSection = (value: unknown, depth: number): Checked<unknown> => {
+/**
+ * `names` are the option names allowed as keys at this object level; `<key:n>`
+ * tokens are always allowed. Below the top level only loaders keep names.
+ */
+const sanitizeSection = (
+  value: unknown,
+  depth: number,
+  names: ReadonlySet<string>,
+): Checked<unknown> => {
   if (depth > MAX_DEPTH) {
     return FAIL;
   }
-  if (typeof value === "boolean") {
+  if (value === null || typeof value === "boolean") {
     return value;
   }
   if (typeof value === "number") {
-    return Number.isFinite(value) ? value : FAIL;
+    if (!Number.isFinite(value)) {
+      return FAIL;
+    }
+    return Number.isInteger(value) && value >= 0 && value <= MAX_INT
+      ? value
+      : "<number>";
   }
   if (typeof value === "string") {
-    return VALUE_STRINGS.has(value) || FORMATTER_PACKAGE.test(value)
-      ? value
-      : FAIL;
+    if (VALUE_STRINGS.has(value) || PACKAGE_NAMES.has(value)) {
+      return value;
+    }
+    return value.startsWith("@graphql-markdown/") ? UNKNOWN_VALUE : FAIL;
   }
   if (Array.isArray(value)) {
     const out: unknown[] = [];
-    for (const item of value) {
-      const checked = sanitizeSection(item, depth + 1);
+    for (const item of value.slice(0, MAX_ITEMS)) {
+      const checked = sanitizeSection(item, depth + 1, names);
       if (checked === FAIL) {
         return FAIL;
       }
@@ -229,15 +378,17 @@ const sanitizeSection = (value: unknown, depth: number): Checked<unknown> => {
   }
   if (isObject(value)) {
     const out: Json = {};
-    for (const [key, item] of Object.entries(value)) {
-      if (
-        !KEY_TOKEN.test(key) &&
-        !OPTION_KEY.test(key) &&
-        !KNOWN_LOADER_SET.has(key)
-      ) {
+    for (const [key, item] of Object.entries(value).slice(0, MAX_ITEMS)) {
+      if (!KEY_TOKEN.test(key) && !names.has(key)) {
         return FAIL;
       }
-      const checked = sanitizeSection(item, depth + 1);
+      const childNames =
+        depth === 0
+          ? (NESTED_NAMES[key] ?? NO_NAMES)
+          : names === LOADER_NAMES
+            ? LOADER_NAMES
+            : NO_NAMES;
+      const checked = sanitizeSection(item, depth + 1, childNames);
       if (checked === FAIL) {
         return FAIL;
       }
@@ -314,28 +465,19 @@ export const validate = (payload: unknown): ValidationResult => {
   if (typeof payload.pkg !== "string") {
     return fail("schema");
   }
-  out.pkg = FORMATTER_PACKAGE.test(payload.pkg) ? payload.pkg : UNKNOWN_VALUE;
+  out.pkg = PACKAGE_NAMES.has(payload.pkg) ? payload.pkg : UNKNOWN_VALUE;
 
-  if (
-    typeof payload.pkgVersion !== "string" ||
-    !SEMVER.test(payload.pkgVersion)
-  ) {
-    return fail("schema");
-  }
-  out.pkgVersion = payload.pkgVersion;
+  out.pkgVersion = normaliseVersion(payload.pkgVersion);
 
-  if (!isCount(payload.nodeMajor, 99)) {
-    return fail("schema");
-  }
-  out.nodeMajor = payload.nodeMajor;
+  out.nodeMajor = inRange(payload.nodeMajor, 18, 40)
+    ? payload.nodeMajor
+    : UNKNOWN_VALUE;
 
-  if (
-    payload.graphqlMajor !== ALLOWLIST.graphqlMajorUnknown &&
-    !isCount(payload.graphqlMajor, 99)
-  ) {
-    return fail("schema");
-  }
-  out.graphqlMajor = payload.graphqlMajor;
+  out.graphqlMajor =
+    payload.graphqlMajor === ALLOWLIST.graphqlMajorUnknown ||
+    inRange(payload.graphqlMajor, 14, 30)
+      ? payload.graphqlMajor
+      : UNKNOWN_VALUE;
 
   for (const key of ["ci", "firstRun", "container", "wsl"]) {
     if (typeof payload[key] !== "boolean") {
@@ -366,7 +508,11 @@ export const validate = (payload: unknown): ValidationResult => {
     if (!isObject(payload[section])) {
       return fail("schema");
     }
-    const checked = sanitizeSection(payload[section], 0);
+    const checked = sanitizeSection(
+      payload[section],
+      0,
+      section === "config" ? CONFIG_KEYS : CLI_KEYS,
+    );
     if (checked === FAIL) {
       return fail("schema");
     }

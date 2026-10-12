@@ -72,7 +72,7 @@ describe("validate: accepted payloads", () => {
   });
 
   it("accepts numbers and booleans inside config", () => {
-    expect(validate(withConfig({ depth: 3, flag: false })).ok).toBe(true);
+    expect(validate(withConfig({ force: false, printTypeOptions: { parentTypePrefix: true } })).ok).toBe(true);
   });
 });
 
@@ -134,12 +134,6 @@ describe("validate: failures", () => {
   it.each([
     ["missing event", { event: undefined }],
     ["non-string trigger", { trigger: 3 }],
-    ["bad pkgVersion", { pkgVersion: "latest" }],
-    ["pkgVersion with path", { pkgVersion: "1.2.3/../x" }],
-    ["pkgVersion two parts", { pkgVersion: "1.2" }],
-    ["fractional nodeMajor", { nodeMajor: 20.5 }],
-    ["huge nodeMajor", { nodeMajor: 1000 }],
-    ["string graphqlMajor", { graphqlMajor: "16" }],
     ["non-boolean ci", { ci: "false" }],
     ["non-boolean wsl", { wsl: 0 }],
     ["negative unknownKeys", { unknownKeys: -1 }],
@@ -172,7 +166,6 @@ describe("validate: leaking payloads", () => {
     ["leaky key path", { "/etc/passwd": "<path>" }],
     ["leaky key url", { "https://x.test": "<url>" }],
     ["leaky key dotted", { "api.acme.internal": "<url>" }],
-    ["null value", { schema: null }],
   ])("rejects %s in config", (_name, config) => {
     expect(validate(withConfig(config))).toEqual({
       ok: false,
@@ -192,5 +185,145 @@ describe("validate: leaking payloads", () => {
       nested = { a: nested };
     }
     expect(validate(withConfig(nested)).ok).toBe(false);
+  });
+});
+
+describe("validate: key allowlist", () => {
+  it.each([
+    ["directive-like key", { "@deprecated": "<string>" }],
+    ["arbitrary key", { myCompanySecret: true }],
+    ["unknown nested key", { printTypeOptions: { internalHost: true } }],
+    ["cli-only key in config", { diff: "NONE" }],
+    ["named key inside a map", { metatags: [{ robots: "<string>" }] }],
+    ["unknown key inside groupByDirective", { groupByDirective: { x: "<string>" } }],
+  ])("rejects %s in config", (_name, config) => {
+    expect(validate(withConfig(config))).toEqual({ ok: false, reason: "schema" });
+  });
+
+  it("rejects an arbitrary key in cli", () => {
+    expect(validate({ ...base(), cli: { myFlag: true } })).toEqual({
+      ok: false,
+      reason: "schema",
+    });
+  });
+
+  it("accepts known option names, key tokens and loader names", () => {
+    const config = {
+      docOptions: { index: true, frontMatter: { "<key:0>": "<string>" } },
+      loaders: { GitLoader: { module: "@graphql-tools/git-loader", options: {} } },
+    };
+    expect(validate(withConfig(config))).toMatchObject({ ok: true });
+  });
+});
+
+describe("validate: closed sets for free-text channels", () => {
+  it.each([
+    ["1.2.3", "1.2.3"],
+    ["1.2.3-rc.1", "1.2.3-rc.1"],
+    ["1.2.3-beta.4-my-secret-branch", "1.2.3-beta.4"],
+    ["1.2.3-beta-secret", "1.2.3-beta.0"],
+    ["1.2.3-secretbranch.1", "unknown-value"],
+    ["1.2.3+build.secret", "unknown-value"],
+    ["latest", "unknown-value"],
+    ["1.2.3/../x", "unknown-value"],
+    ["1.2", "unknown-value"],
+  ])("normalises pkgVersion %s", (input, expected) => {
+    expect(validate({ ...base(), pkgVersion: input })).toMatchObject({
+      ok: true,
+      value: { pkgVersion: expected },
+    });
+  });
+
+  it("maps unknown package names to unknown-value", () => {
+    for (const pkg of ["@graphql-markdown/acme-secret", "create-graphql-markdown-docs-x"]) {
+      expect(validate({ ...base(), pkg })).toMatchObject({ value: { pkg: "unknown-value" } });
+    }
+    expect(validate({ ...base(), pkg: "create-graphql-markdown-docs" })).toMatchObject({
+      value: { pkg: "create-graphql-markdown-docs" },
+    });
+  });
+
+  it("rejects unknown package names in config values", () => {
+    expect(validate(withConfig({ formatter: "@graphql-markdown/formatters/hugo" })).ok).toBe(true);
+  });
+
+  it("masks numbers other than integers 0-1000 and rejects non-finite ones", () => {
+    for (const n of [1234567890, -1, 1.5, 1001]) {
+      expect(validate(withConfig({ force: n }))).toMatchObject({
+        ok: true,
+        value: { config: { force: "<number>" } },
+      });
+    }
+    expect(validate(withConfig({ force: 1000 }))).toMatchObject({
+      ok: true,
+      value: { config: { force: 1000 } },
+    });
+    for (const n of [Infinity, -Infinity, NaN]) {
+      expect(validate(withConfig({ force: n })).ok).toBe(false);
+    }
+  });
+
+  it("limits key tokens, array length and object size", () => {
+    expect(validate(withConfig({ metatags: [{ "<key:999>": "<string>" }] })).ok).toBe(true);
+    expect(validate(withConfig({ metatags: [{ "<key:1234567>": "<string>" }] })).ok).toBe(false);
+    expect(validate(withConfig({ metatags: [{ "<key:99>": "<string>" }] })).ok).toBe(true);
+    expect(validate(withConfig({ skipDocDirective: Array(50).fill("<string>") })).ok).toBe(true);
+    const wide = Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`<key:${i}>`, "<string>"]));
+    expect(validate(withConfig({ metatags: [wide] })).ok).toBe(true);
+  });
+
+  it("accepts null option values", () => {
+    expect(validate(withConfig({ id: null, force: null }))).toMatchObject({
+      ok: true,
+      value: { config: { id: null, force: null } },
+    });
+  });
+
+  it("accepts a 120-entry map and stores 50 keys", () => {
+    const wide = Object.fromEntries(Array.from({ length: 120 }, (_, i) => [`<key:${i}>`, "<string>"]));
+    const res = validate(withConfig({ metatags: wide })) as any;
+    expect(res.ok).toBe(true);
+    expect(Object.keys(res.value.config.metatags)).toHaveLength(50);
+  });
+
+  it("truncates arrays and objects over 50 entries", () => {
+    const long = validate(withConfig({ skipDocDirective: Array(60).fill("<string>") }));
+    expect(long).toMatchObject({ ok: true });
+    expect((long as any).value.config.skipDocDirective).toHaveLength(50);
+    const wide = Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`<key:${i}>`, "<string>"]));
+    const res = validate(withConfig({ metatags: wide })) as any;
+    expect(Object.keys(res.value.config.metatags)).toHaveLength(50);
+    expect(res.value.config.metatags["<key:49>"]).toBe("<string>");
+    expect(res.value.config.metatags["<key:50>"]).toBeUndefined();
+  });
+
+  it("accepts <custom-loader> as a loaders key and natural as a value", () => {
+    const res = validate(
+      withConfig({
+        loaders: { "<custom-loader>": { module: "<custom-loader>" } },
+        docOptions: { categorySort: "natural" },
+      }),
+    );
+    expect(res).toMatchObject({ ok: true });
+  });
+
+  it("maps unlisted @graphql-markdown strings to unknown-value", () => {
+    expect(validate(withConfig({ formatter: "@graphql-markdown/acme-secret" }))).toMatchObject({
+      ok: true,
+      value: { config: { formatter: "unknown-value" } },
+    });
+    expect(validate(withConfig({ id: "@graphql-markdown/x/y" }))).toMatchObject({
+      value: { config: { id: "unknown-value" } },
+    });
+    expect(validate(withConfig({ id: "secret" })).ok).toBe(false);
+  });
+
+  it("maps out-of-range node and graphql majors to unknown-value", () => {
+    expect(validate({ ...base(), nodeMajor: 1000, graphqlMajor: 3 })).toMatchObject({
+      value: { nodeMajor: "unknown-value", graphqlMajor: "unknown-value" },
+    });
+    expect(validate({ ...base(), nodeMajor: 20.5, graphqlMajor: "16" })).toMatchObject({
+      value: { nodeMajor: "unknown-value", graphqlMajor: "unknown-value" },
+    });
   });
 });
