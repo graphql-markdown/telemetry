@@ -72,12 +72,14 @@ jobs:
         run: |
           tofu init -backend=false
           tofu validate
+          tofu test
 
       - name: Init and validate (infra/bootstrap)
         working-directory: infra/bootstrap
         run: |
           tofu init -backend=false
           tofu validate
+          tofu test
 
   # There is no apply job yet. When it exists, run after `tofu apply` and
   # before the Worker is used:

@@ -58,6 +58,15 @@ Notes:
 - Quarantined rows (`blob17 = '1'`) are kept in Analytics Engine but excluded from `raw` and from the public aggregates.
 - The `n<5` rule applies after aggregation: any value with fewer than 5 events in the selected range is hidden and counted as suppressed. Do not publish per-row counts below that threshold.
 
+## Testing infrastructure
+
+Plan-only OpenTofu tests use mocked providers, so no credentials are needed. The Worker bundle is replaced by `infra/tests/fixtures/worker.js` through `worker_bundle_path`, so no build is required.
+
+```sh
+cd infra && tofu init -backend=false && tofu test
+cd infra/bootstrap && tofu init -backend=false && tofu test
+```
+
 ## Setup
 
 Follow these steps in order. Every command runs from the repository root unless a `cd` is shown.
@@ -169,7 +178,7 @@ bun run typecheck
 bun run test       # vitest
 ```
 
-For the infrastructure, run `tofu fmt -check -recursive` and `tofu init -backend=false && tofu validate` in `infra/` (as CI does). There are no `.tftest.hcl` files yet; `tofu test` will run them once they are added.
+For the infrastructure, run `tofu fmt -check -recursive` and `tofu init -backend=false && tofu validate` in `infra/` (as CI does). Then run `tofu test` in `infra/` and `infra/bootstrap/` (see [Testing infrastructure](#testing-infrastructure)).
 
 ### 10. Token rotation and teardown
 

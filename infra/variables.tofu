@@ -36,6 +36,11 @@ variable "alert_webhook" {
 variable "dashboard_emails" {
   description = "Email addresses allowed to open the dashboard (one-time PIN login)."
   type        = list(string)
+
+  validation {
+    condition     = length(var.dashboard_emails) > 0
+    error_message = "dashboard_emails must contain at least one address."
+  }
 }
 
 variable "access_team_domain" {
@@ -47,4 +52,10 @@ variable "public_stats" {
   description = "\"true\" enables the public aggregates at /public. Default off."
   type        = string
   default     = "false"
+}
+
+variable "worker_bundle_path" {
+  description = "Path to the bundled Worker. Null uses ../worker/dist/index.js (tests point it at a fixture)."
+  type        = string
+  default     = null
 }

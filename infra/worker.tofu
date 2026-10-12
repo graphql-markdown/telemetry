@@ -2,6 +2,7 @@
 
 locals {
   worker_name = "gqlmd-telemetry"
+  bundle_path = coalesce(var.worker_bundle_path, "${path.module}/../worker/dist/index.js")
 }
 
 resource "cloudflare_d1_database" "telemetry" {
@@ -38,7 +39,7 @@ resource "cloudflare_workers_script" "telemetry" {
 
   # Module worker bundled by `wrangler deploy --dry-run --outdir dist`.
   main_module        = "index.js"
-  content            = file("${path.module}/../worker/dist/index.js") # verify: v5 may prefer content_file + content_sha256
+  content            = file(local.bundle_path) # verify: v5 may prefer content_file + content_sha256
   compatibility_date = "2026-08-01"
 
   # verify: the dashboard/ static assets (ASSETS binding, run_worker_first) need a
