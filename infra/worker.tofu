@@ -41,6 +41,9 @@ resource "cloudflare_workers_script" "telemetry" {
   content            = file("${path.module}/../worker/dist/index.js") # verify: v5 may prefer content_file + content_sha256
   compatibility_date = "2026-08-01"
 
+  # verify: the dashboard/ static assets (ASSETS binding, run_worker_first) need a
+  # v5 assets upload session, or deploy the Worker with `wrangler deploy` instead.
+
   # Observability (logs and traces) stays off: no request data is logged.
   observability = {
     enabled = false
@@ -107,7 +110,28 @@ resource "cloudflare_workers_script" "telemetry" {
       type = "secret_text"
       text = var.alert_webhook
     },
+    {
+      name = "ACCESS_TEAM_DOMAIN"
+      type = "plain_text"
+      text = var.access_team_domain
+    },
+    {
+      name = "ACCESS_AUD"
+      type = "plain_text"
+      text = cloudflare_zero_trust_access_application.dashboard.aud
+    },
+    {
+      name = "PUBLIC_STATS"
+      type = "plain_text"
+      text = var.public_stats
+    },
   ] # verify: binding attribute names (namespace_id, simple) against the v5 schema
+
+  # wrangler deploy owns the bundle and the static assets after the first deploy;
+  # tofu keeps the bindings and vars but must not overwrite the uploaded script.
+  lifecycle {
+    ignore_changes = [content]
+  }
 }
 
 # Daily rollup of day D-1 (UTC).

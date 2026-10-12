@@ -18,6 +18,14 @@ export interface Env {
   RL_COLO?: RateLimit;
   /** Hard ceiling per `(fp, colo)`: 1000 per 60 s; above it events are sampled 1/20 and flagged. */
   RL_HARD?: RateLimit;
+  /** Access team domain, e.g. `team.cloudflareaccess.com` (JWKS host and issuer). */
+  ACCESS_TEAM_DOMAIN?: string;
+  /** Access application AUD tag the JWT must carry. */
+  ACCESS_AUD?: string;
+  /** `"true"` enables the public aggregates (`/public`). Default `"false"`: 404. */
+  PUBLIC_STATS?: string;
+  /** Static assets (dashboard). */
+  ASSETS?: Fetcher;
   /** Comma-separated retired payload versions (answered with 410). Empty by default. */
   RETIRED_VERSIONS?: string;
 }

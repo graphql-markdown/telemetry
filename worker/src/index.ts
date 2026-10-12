@@ -1,9 +1,11 @@
+import { verifyAccess } from "./access";
 import { sendAlert } from "./alert";
 import { readBody } from "./body";
 import type { Env, RejectReason } from "./env";
 import { fingerprints, formatterOf } from "./fingerprint";
 import { previousDay, rollupDay } from "./rollup";
 import { validate } from "./schema";
+import { handlePublic, handleStats } from "./stats";
 
 type Json = Record<string, unknown>;
 
@@ -191,9 +193,53 @@ const ingest = async (request: Request, env: Env): Promise<Response> => {
   return new Response(null, { status: 202 });
 };
 
+/**
+ * Headers for dashboard and public responses. The static dashboard at "/" is
+ * served by assets directly and gets the same headers from dashboard/_headers.
+ */
+export const SECURITY_HEADERS: Record<string, string> = {
+  "Content-Security-Policy":
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "no-referrer",
+};
+
+const secured = (res: Response): Response => {
+  const headers = new Headers(res.headers);
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    headers.set(name, value);
+  }
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+};
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === "/v1/stats" || url.pathname.startsWith("/v1/stats/")) {
+      if (request.method !== "GET") {
+        return secured(
+          new Response("Method Not Allowed", {
+            status: 405,
+            headers: { allow: "GET" },
+          }),
+        );
+      }
+      if (!(await verifyAccess(request, env))) {
+        return secured(new Response("Forbidden", { status: 403 }));
+      }
+      return secured(await handleStats(url, env));
+    }
+    if (url.pathname === "/public" || url.pathname.startsWith("/public/")) {
+      if (request.method !== "GET") {
+        return secured(
+          new Response("Method Not Allowed", {
+            status: 405,
+            headers: { allow: "GET" },
+          }),
+        );
+      }
+      return secured(await handlePublic(url, env));
+    }
     if (url.pathname !== "/v1/event") {
       return new Response("Not Found", { status: 404 });
     }

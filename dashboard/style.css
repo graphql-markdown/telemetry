@@ -1,0 +1,44 @@
+:root {
+  --bg: #fff;
+  --fg: #1b1f24;
+  --muted: #5a6572;
+  --card: #f5f7fa;
+  --line: #d5dbe3;
+  --accent: #2f6fed;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #11151a;
+    --fg: #e6eaf0;
+    --muted: #9aa6b4;
+    --card: #1a2028;
+    --line: #2d3640;
+    --accent: #7aa2ff;
+  }
+}
+body { margin: 0; padding: 0 1rem 2rem; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
+header, main, footer { max-width: 1200px; margin: 0 auto; }
+h1 { font-size: 1.4rem; }
+h2 { font-size: 1.05rem; margin: 0 0 .5rem; }
+form { display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; align-items: center; }
+fieldset { border: 1px solid var(--line); border-radius: 6px; padding: .2rem .6rem; }
+legend { color: var(--muted); font-size: .8rem; }
+input, select, button { font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 4px; }
+#status { color: var(--muted); min-height: 1.5em; }
+main { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 1rem; }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 1rem; overflow: auto; }
+.chart { min-height: 220px; }
+.bars { list-style: none; padding: 0; margin: 0 0 .5rem; }
+.bars li { display: grid; grid-template-columns: 9rem 1fr 5rem; gap: .5rem; align-items: center; }
+.bars .bar { height: .8rem; background: var(--accent); border-radius: 2px; }
+.bars .n { text-align: right; font-variant-numeric: tabular-nums; }
+details { margin-top: .5rem; }
+summary { cursor: pointer; color: var(--muted); }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+th, td { border-bottom: 1px solid var(--line); padding: .2rem .4rem; text-align: left; vertical-align: top; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: .8rem; }
+.note { color: var(--muted); font-size: .85rem; }
+footer { margin-top: 1.5rem; color: var(--muted); font-size: .85rem; }
+.u-legend { color: var(--fg); }
+.u-title { color: var(--fg); }

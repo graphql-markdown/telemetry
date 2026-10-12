@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>GraphQL-Markdown telemetry</title>
+  <link rel="stylesheet" href="vendor/uPlot.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>GraphQL-Markdown telemetry</h1>
+    <form id="controls" aria-label="Filters">
+      <label>From <input type="date" id="from" required></label>
+      <label>To <input type="date" id="to" required></label>
+      <fieldset>
+        <legend>Measure</legend>
+        <label><input type="radio" name="measure" value="events" checked> events</label>
+        <label><input type="radio" name="measure" value="debounced"> debounced</label>
+        <select id="interval" aria-label="Debounce interval">
+          <option value="1h">1 h</option>
+          <option value="1d">1 d</option>
+        </select>
+        <label><input type="radio" name="measure" value="configs"> distinct configs</label>
+        <label><input type="radio" name="measure" value="colo_sampled"> colo sampled</label>
+      </fieldset>
+      <fieldset>
+        <legend>View</legend>
+        <label><input type="radio" name="view" value="local" checked> local</label>
+        <label><input type="radio" name="view" value="ci"> CI</label>
+        <label><input type="radio" name="view" value="all"> all</label>
+      </fieldset>
+    </form>
+    <p id="status" role="status"></p>
+  </header>
+
+  <main id="panels">
+    <section data-panel="versions" data-title="Runs per day by version" data-dim="pkgVersion" data-kind="series"></section>
+    <section data-panel="ci" data-title="CI vs local runs per day" data-dim="ci" data-kind="series" data-view="all" data-labels="ci"></section>
+    <section data-panel="provider" data-title="CI provider share" data-dim="ciProvider" data-kind="share" data-view="ci"></section>
+    <section data-panel="formatter" data-title="Formatter share" data-dim="formatter" data-kind="share"></section>
+    <section data-panel="graphql" data-title="GraphQL major version" data-dim="graphqlMajor" data-kind="share"></section>
+    <section data-panel="loader" data-title="Loader kinds" data-dim="loader.kind" data-kind="share"></section>
+    <section data-panel="create" data-title="Scaffold vs wire (create events)" data-dim="event" data-kind="share" data-only="create_scaffold,create_wire"></section>
+    <section data-panel="targets" data-title="Create targets" data-dim="target" data-kind="share"></section>
+    <section data-panel="settings" data-title="Top settings" data-kind="settings"></section>
+    <section data-panel="catalog" data-title="Config catalog" data-kind="catalog"></section>
+    <section data-panel="health" data-title="Rejects and quarantined" data-kind="health"></section>
+  </main>
+
+  <footer>
+    <p><strong>n&lt;5 suppressed:</strong> any value with fewer than 5 events over the selected range is hidden and counted as suppressed.</p>
+    <p>Accepted biases: opt-out, blocked-network and corporate-proxy users are undercounted; custom formatters and loaders are masked as "custom"; <code>firstRun</code> is approximate (especially in containers); fake events are only mitigated by the anti-abuse layers. Events are an upper bound, distinct configs a lower bound; the true number lies in between. Local and CI units differ (one event per distinct config per machine vs one per CI run); "all" adds them together. Totals of debounced measures are sums of daily values.</p>
+  </footer>
+
+  <script src="vendor/uPlot.iife.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
