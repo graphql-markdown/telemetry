@@ -20,6 +20,17 @@ variable "cloudflare_api_token" {
   sensitive   = true
 }
 
+variable "ae_sql_token" {
+  description = "Read-only API token (Account Analytics: Read) the cron uses for the Analytics Engine SQL API. Created by hand, see README."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.ae_sql_token) > 0
+    error_message = "ae_sql_token must not be empty."
+  }
+}
+
 variable "state_passphrase" {
   description = "Passphrase for state and plan encryption."
   type        = string
