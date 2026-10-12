@@ -1,27 +1,12 @@
 # Plan-only tests: mocked providers, no credentials. Run with `tofu test`.
 
-mock_provider "cloudflare" {
-  # The mocked list data source returns no items by default; give the token
-  # policy a permission group to reference.
-  override_data {
-    target = data.cloudflare_api_token_permission_groups_list.analytics_read
-    values = {
-      result = [{
-        id            = "00000000000000000000000000000001"
-        name          = "Account Analytics Read"
-        category      = "Analytics"
-        is_selectable = true
-        scopes        = ["com.cloudflare.api.account"]
-      }]
-    }
-  }
-}
+mock_provider "cloudflare" {}
 
 variables {
   account_id           = "00000000000000000000000000000000"
-  zone_id              = "11111111111111111111111111111111"
-  domain               = "telemetry.example.test"
+  workers_subdomain    = "example"
   cloudflare_api_token = "dummy"
+  ae_sql_token         = "dummy-read-token"
   state_passphrase     = "dummy-passphrase-0123456789"
   dashboard_emails     = ["me@example.test"]
   access_team_domain   = "team.cloudflareaccess.com"
@@ -38,7 +23,7 @@ run "worker_script" {
 
   assert {
     condition = alltrue([
-      for n in ["EVENTS", "REJECTS", "RL", "RL_HARD", "RL_COLO", "DB", "AE_SQL_TOKEN", "ALERT_WEBHOOK", "ACCESS_AUD", "ACCESS_TEAM_DOMAIN"] :
+      for n in ["EVENTS", "REJECTS", "RL", "RL_HARD", "RL_COLO", "DB", "AE_SQL_TOKEN", "ALERT_WEBHOOK", "ROLE"] :
       contains([for b in cloudflare_workers_script.telemetry.bindings : b.name], n)
     ])
     error_message = "missing a required binding" # verify: bindings is a list of objects in v5
@@ -82,12 +67,54 @@ run "no_secret_as_plain_text" {
   }
 }
 
-run "custom_domain" {
+run "workers_dev_subdomains" {
   command = plan
 
   assert {
-    condition     = cloudflare_workers_custom_domain.telemetry.hostname == var.domain
-    error_message = "custom domain must equal var.domain"
+    condition     = cloudflare_workers_script_subdomain.telemetry.script_name == "gqlmd-telemetry" && cloudflare_workers_script_subdomain.telemetry.enabled == true
+    error_message = "the ingest Worker must be enabled on workers.dev" # verify: v5 attribute names
+  }
+
+  assert {
+    condition     = cloudflare_workers_script_subdomain.dashboard.script_name == "gqlmd-telemetry-dashboard" && cloudflare_workers_script_subdomain.dashboard.enabled == true
+    error_message = "the dashboard Worker must be enabled on workers.dev"
+  }
+
+  assert {
+    condition     = cloudflare_workers_script_subdomain.telemetry.previews_enabled == false && cloudflare_workers_script_subdomain.dashboard.previews_enabled == false
+    error_message = "preview URLs must stay off"
+  }
+}
+
+run "worker_roles" {
+  command = plan
+
+  assert {
+    condition     = [for b in cloudflare_workers_script.telemetry.bindings : b.text if b.name == "ROLE"][0] == "ingest"
+    error_message = "the ingest Worker must have ROLE=ingest"
+  }
+
+  assert {
+    condition     = [for b in cloudflare_workers_script.dashboard.bindings : b.text if b.name == "ROLE"][0] == "dashboard"
+    error_message = "the dashboard Worker must have ROLE=dashboard"
+  }
+
+  assert {
+    condition = alltrue([
+      for b in cloudflare_workers_script.dashboard.bindings :
+      !contains(["EVENTS", "REJECTS", "RL", "RL_HARD", "RL_COLO", "QUARANTINE", "AE_SQL_TOKEN", "ALERT_WEBHOOK", "ASSETS"], b.name)
+    ])
+    error_message = "the dashboard Worker must have no Analytics Engine, rate limit, KV or secret bindings"
+  }
+
+  assert {
+    condition     = alltrue([for n in ["DB", "ROLE", "ACCESS_TEAM_DOMAIN", "ACCESS_AUD"] : contains([for b in cloudflare_workers_script.dashboard.bindings : b.name], n)])
+    error_message = "the dashboard Worker needs DB, ROLE and the Access vars"
+  }
+
+  assert {
+    condition     = cloudflare_workers_script.dashboard.observability.enabled == false
+    error_message = "dashboard observability must be disabled"
   }
 }
 
@@ -100,44 +127,44 @@ run "cron" {
   }
 }
 
-run "ae_sql_token_read_only" {
+run "ae_sql_token_from_variable" {
   command = plan
 
   assert {
-    condition     = data.cloudflare_api_token_permission_groups_list.analytics_read.name == "Account Analytics Read"
-    error_message = "token must use the analytics read permission group"
+    condition     = [for b in cloudflare_workers_script.telemetry.bindings : b.type if b.name == "AE_SQL_TOKEN"][0] == "secret_text"
+    error_message = "AE_SQL_TOKEN must be secret_text"
   }
 
   assert {
-    condition = alltrue([
-      for p in cloudflare_api_token.ae_sql.policies : length(p.permission_groups) == 1
-    ])
-    error_message = "token policy must carry only the analytics read group" # verify: v5 policies shape
+    condition     = [for b in cloudflare_workers_script.telemetry.bindings : b.text if b.name == "AE_SQL_TOKEN"][0] == var.ae_sql_token
+    error_message = "AE_SQL_TOKEN must come from var.ae_sql_token"
+  }
+}
+
+run "empty_ae_sql_token_rejected" {
+  command = plan
+
+  variables {
+    ae_sql_token = ""
   }
 
-  assert {
-    condition     = !can(regex("(?i)write|edit", data.cloudflare_api_token_permission_groups_list.analytics_read.name))
-    error_message = "token must have no write or edit scope"
-  }
+  expect_failures = [var.ae_sql_token]
 }
 
 run "access_application" {
   command = plan
 
   assert {
-    condition = alltrue([
-      contains([for d in cloudflare_zero_trust_access_application.dashboard.destinations : d.uri], "${var.domain}/"),
-      contains([for d in cloudflare_zero_trust_access_application.dashboard.destinations : d.uri], "${var.domain}/v1/stats*"),
-    ])
-    error_message = "Access must cover / and /v1/stats*" # verify: destinations shape
+    condition     = [for d in cloudflare_zero_trust_access_application.dashboard.destinations : d.uri] == ["gqlmd-telemetry-dashboard.${var.workers_subdomain}.workers.dev"]
+    error_message = "Access must cover exactly the dashboard host, with no paths" # verify: destinations shape
   }
 
   assert {
     condition = alltrue([
       for d in cloudflare_zero_trust_access_application.dashboard.destinations :
-      !strcontains(d.uri, "/v1/event") && !strcontains(d.uri, "/public")
+      !strcontains(d.uri, "/") && !strcontains(d.uri, "gqlmd-telemetry.")
     ])
-    error_message = "Access must not cover /v1/event or /public*"
+    error_message = "Access must not cover the ingest host or any path"
   }
 
   assert {
@@ -154,4 +181,14 @@ run "empty_dashboard_emails_rejected" {
   }
 
   expect_failures = [var.dashboard_emails]
+}
+
+run "empty_workers_subdomain_rejected" {
+  command = plan
+
+  variables {
+    workers_subdomain = ""
+  }
+
+  expect_failures = [var.workers_subdomain]
 }

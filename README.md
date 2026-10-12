@@ -14,8 +14,8 @@ No personal data is collected or stored: there are no identifiers, and no IP add
  CLI (@graphql-markdown/telemetry)
    │  POST /v1/event  (JSON, allowlisted fields only)
    ▼
- Worker  telemetry.graphql-markdown.dev
-   │  validate, fingerprint, rate-limit, quarantine flag
+ Ingest Worker  gqlmd-telemetry.<sub>.workers.dev
+   │  validate, fingerprint, rate-limit, quarantine flag (KV)
    ├──► Analytics Engine   gqlmd_events (raw, ~90 days)
    │                       gqlmd_rejects (reason counters, no payload)
    │
@@ -24,8 +24,12 @@ No personal data is collected or stored: there are no identifiers, and no IP add
  D1  gqlmd-telemetry   daily_counts, config_catalog, rejects_daily, generate_daily, generate_errors_daily (unlimited history)
    │
    ├──► GET /v1/stats   JSON, Access JWT verified by the Worker
-   └──► GET /           static dashboard, behind Cloudflare Access
-        GET /public     optional aggregates, only when PUBLIC_STATS=true
+   └──► GET /           static dashboard
+        (both on the dashboard Worker, gqlmd-telemetry-dashboard.<sub>.workers.dev,
+        whole URL behind Cloudflare Access)
+
+ Ingest Worker also serves GET /public (optional aggregates, only when PUBLIC_STATS=true;
+ page assets from public/)
 ```
 
 ## Privacy invariants
@@ -33,10 +37,10 @@ No personal data is collected or stored: there are no identifiers, and no IP add
 These hold in every change. Review them before merging anything that touches `worker/`.
 
 - The Worker never reads, logs, hashes or stores the IP address, the User-Agent, or any request header except `Content-Type`, `Content-Encoding` and `Content-Length`.
-- The only other header read is the Access JWT, and only on `/v1/stats`. `request.cf.colo` is used in memory for rate limits and the quarantine key, and is never stored.
+- The only other header read is the Access JWT, and only on `/v1/stats`. `request.cf.colo` is used in memory for rate limits and the quarantine key (KV, 1 h TTL), and is never stored.
 - No `console.log` of request data. `observability.enabled` is `false` in `worker/wrangler.jsonc`.
 - Only allowlisted payload fields are stored (`worker/src/schema.ts`). Reject counters carry the reason only.
-- The dashboard and public pages send a strict Content-Security-Policy (`default-src 'self'`, no inline script or style, `frame-ancestors 'none'`) and `Referrer-Policy: no-referrer`. uPlot is self-hosted in `dashboard/vendor/`.
+- The dashboard and public pages send a strict Content-Security-Policy (`default-src 'self'`, no inline script or style, `frame-ancestors 'none'`) and `Referrer-Policy: no-referrer`. uPlot is self-hosted in `dashboard/vendor/`. Static assets get the same headers from `dashboard/_headers` and `public/_headers` (keep them identical).
 
 ## Queries
 
@@ -83,7 +87,7 @@ Follow these steps in order. Every command runs from the repository root unless 
 
 ### 1. Prerequisites
 
-- A Cloudflare account, with the zone `graphql-markdown.dev` on it and Zero Trust enabled (Zero Trust > Settings: set the team domain, for example `myteam.cloudflareaccess.com`).
+- A Cloudflare account with Zero Trust enabled (Zero Trust > Settings: set the team domain, for example `myteam.cloudflareaccess.com`) and a workers.dev subdomain set (Workers & Pages > Account details). No zone is needed: both Workers are served on workers.dev.
 - [OpenTofu](https://opentofu.org) matching `.opentofu-version` (`1.10.x`).
 - [bun](https://bun.sh). Install the dependencies, including the pinned `wrangler`, with `bun install`.
 
@@ -95,14 +99,14 @@ Create a token at Cloudflare dashboard > My Profile > API Tokens, with these per
 | --- | --- |
 | Account | Workers Scripts: Edit |
 | Account | D1: Edit |
+| Account | Workers KV Storage: Edit |
 | Account | Workers R2 Storage: Edit |
 | Account | Access: Apps and Policies: Edit |
 | Account | Account Analytics: Read |
-| Account | API Tokens: Edit (tofu creates the read-only Analytics token used by the cron) |
-| Zone (graphql-markdown.dev) | Workers Routes: Edit |
-| Zone (graphql-markdown.dev) | DNS: Edit (custom domains create the DNS record) |
 
-Note the **account ID** (dashboard home > account menu > Copy account ID) and the **zone ID** (zone Overview page, right column).
+There are no Zone permissions. Note the **account ID** (dashboard home > account menu > Copy account ID) and the **workers.dev subdomain** (the `<sub>` in `<script>.<sub>.workers.dev`).
+
+The cron needs a second, read-only token for the Analytics Engine SQL API. Create it the same way with a single permission, **Account | Account Analytics: Read**, restricted to this account. Keep it for step 4 (`AE_SQL_TOKEN`).
 
 ### 3. One-time bootstrap
 
@@ -129,12 +133,13 @@ Add these under Settings > Secrets and variables > Actions. The names match the 
 | `AWS_ACCESS_KEY_ID` | secret | R2 S3 access key for the state backend |
 | `AWS_SECRET_ACCESS_KEY` | secret | R2 S3 secret for the state backend |
 | `TOFU_STATE_PASSPHRASE` | secret | `state_passphrase`; keep a copy in a password manager, losing it makes the state unreadable |
+| `AE_SQL_TOKEN` | secret | `ae_sql_token`, the read-only Analytics token from step 2 |
 | `ALERT_WEBHOOK` | secret, optional | `alert_webhook` (no-events alert) |
-| `ZONE_ID` | variable | `zone_id` |
+| `WORKERS_SUBDOMAIN` | variable | `workers_subdomain` |
 | `ACCESS_TEAM_DOMAIN` | variable | `access_team_domain` |
 | `DASHBOARD_EMAILS` | variable | `dashboard_emails`, a JSON list such as `["you@example.com"]` |
 
-The workflow does not apply infrastructure yet, so these are only read by a future apply job. For manual runs, export the same values as `TF_VAR_account_id`, `TF_VAR_zone_id`, `TF_VAR_cloudflare_api_token`, `TF_VAR_state_passphrase`, `TF_VAR_access_team_domain` and `TF_VAR_dashboard_emails` (and optionally `TF_VAR_alert_webhook`, `TF_VAR_public_stats`).
+The workflow does not apply infrastructure yet, so these are only read by a future apply job. For manual runs, export the same values as `TF_VAR_account_id`, `TF_VAR_workers_subdomain`, `TF_VAR_cloudflare_api_token`, `TF_VAR_state_passphrase`, `TF_VAR_ae_sql_token`, `TF_VAR_access_team_domain` and `TF_VAR_dashboard_emails` (and optionally `TF_VAR_alert_webhook`, `TF_VAR_public_stats`).
 
 ### 5. Initialise and apply the infrastructure
 
@@ -149,9 +154,9 @@ tofu init -backend-config="endpoints={s3=\"https://<account id>.r2.cloudflaresto
 tofu apply
 ```
 
-This creates the D1 database, the Worker with its secrets and vars (`ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`, `PUBLIC_STATS`), the custom domain and the Access application. `PUBLIC_STATS` is owned by tofu (`public_stats`, default `"false"`); `keep_vars` stops `wrangler deploy` from resetting it.
+This creates the D1 database, the quarantine KV namespace, the two Workers, their workers.dev URLs and the Access application. The ingest Worker gets the secrets and `PUBLIC_STATS`, the dashboard Worker gets `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD`. `PUBLIC_STATS` is owned by tofu (`public_stats`, default `"false"`); `keep_vars` stops `wrangler deploy` from resetting it.
 
-### 6. Deploy the Worker and migrations
+### 6. Deploy the Workers and migrations
 
 ```sh
 export CLOUDFLARE_API_TOKEN=<token>
@@ -159,25 +164,32 @@ export CLOUDFLARE_ACCOUNT_ID=<account id>
 scripts/deploy.sh
 ```
 
-The script reads `d1_database_id` from the tofu output, writes a temporary copy of `worker/wrangler.jsonc` with the real id, runs `wrangler deploy` and `wrangler d1 migrations apply gqlmd-telemetry --remote`, then deletes the copy. It needs `tofu` initialised in `infra/`. Run it again after each Worker change or new file in `migrations/`.
+The script reads `d1_database_id` and `quarantine_kv_id` from the tofu output, writes a temporary copy of `worker/wrangler.jsonc` with the real D1 and KV ids (and the same for `worker/wrangler.dashboard.jsonc`), runs `wrangler deploy` for both configs and `wrangler d1 migrations apply gqlmd-telemetry --remote` once, then deletes the copies. It needs `tofu` initialised in `infra/`. Run it again after each Worker change or new file in `migrations/`.
 
 ### 7. Verify
 
 ```sh
 # Expect HTTP 202
-curl -i -X POST https://telemetry.graphql-markdown.dev/v1/event \
+curl -i -X POST https://gqlmd-telemetry.<sub>.workers.dev/v1/event \
   -H 'Content-Type: application/json' \
   -d '{"v":1,"event":"config","pkg":"@graphql-markdown/cli","pkgVersion":"1.2.3","nodeMajor":24,"graphqlMajor":16,"os":"darwin","ci":false,"pm":"npm","firstRun":false,"trigger":"cli","container":false,"wsl":false,"loader":"url","config":{"schema":"<url>","formatter":"@graphql-markdown/docusaurus"}}'
 
-# Expect HTTP 403 (no Access JWT)
-curl -i 'https://telemetry.graphql-markdown.dev/v1/stats?dim=os'
+# Expect HTTP 404 (stats are served by the dashboard Worker only)
+curl -i 'https://gqlmd-telemetry.<sub>.workers.dev/v1/stats?dim=os'
+
+# Expect a redirect to the Access login (the whole dashboard URL is protected)
+curl -i 'https://gqlmd-telemetry-dashboard.<sub>.workers.dev/v1/stats?dim=os'
 ```
 
-Then open https://telemetry.graphql-markdown.dev/ in a browser and log in with a one-time PIN sent to an address in `dashboard_emails`. The test event appears after the daily rollup (02:00 UTC) of the following day.
+Then open https://gqlmd-telemetry-dashboard.<sub>.workers.dev/ in a browser and log in with a one-time PIN sent to an address in `dashboard_emails`. The test event appears after the daily rollup (02:00 UTC) of the following day.
+
+If the provider rejects a workers.dev destination for the Access application, enable Access by hand instead: Workers & Pages > gqlmd-telemetry-dashboard > Settings > Domains & Routes > workers.dev > Enable Cloudflare Access, copy its AUD tag and pass it in as `access_aud_override` (`TF_VAR_access_aud_override`).
 
 ### 8. Enable the client
 
-In the monorepo, set `DEFAULT_ENDPOINT` in `packages/telemetry/src/constants.ts` to `https://telemetry.graphql-markdown.dev/v1/event`. It is empty until the Worker is live, which keeps telemetry disabled. Release `@graphql-markdown/telemetry` afterwards.
+In the monorepo, set `DEFAULT_ENDPOINT` in `packages/telemetry/src/constants.ts` to `https://gqlmd-telemetry.<sub>.workers.dev/v1/event` (the `ingest_url` output plus `/v1/event`). It is empty until the Worker is live, which keeps telemetry disabled. Release `@graphql-markdown/telemetry` afterwards.
+
+The URL is baked into released clients. Renaming the account's workers.dev subdomain or the `gqlmd-telemetry` script would break them, so do neither. If that ever happens, the escape hatches are the 410 kill switch (`RETIRED_VERSIONS`) and the client's endpoint env override.
 
 ### 9. Local development
 
@@ -192,11 +204,11 @@ For the infrastructure, run `tofu fmt -check -recursive` and `tofu init -backend
 
 ### 10. Token rotation and teardown
 
-- **Rotate the API token:** create the new token with the scopes above, update `CLOUDFLARE_API_TOKEN` (GitHub and your shell), then revoke the old one. The Analytics read token used by the cron is managed by tofu: `tofu apply -replace=cloudflare_api_token.ae_sql` rotates it.
+- **Rotate the API token:** create the new token with the scopes above, update `CLOUDFLARE_API_TOKEN` (GitHub and your shell), then revoke the old one. **Rotate the Analytics read token** (`AE_SQL_TOKEN`): create the new token, update the secret (and `TF_VAR_ae_sql_token` in your shell), run `tofu apply`, then revoke the old one.
 - **Rotate the R2 S3 credentials:** create new ones, update `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, then delete the old ones.
 - **Do not rotate `TOFU_STATE_PASSPHRASE`** without migrating the state first; it encrypts the state and plans.
 - **Teardown:** `tofu destroy` in `infra/`, then in `infra/bootstrap` (this removes the state bucket; empty it first). Deleting the D1 database deletes the rollup history.
 
 ### Required Worker secrets
 
-`AE_SQL_TOKEN` (Account Analytics Read) and `ACCOUNT_ID` for the daily rollup, and optionally `ALERT_WEBHOOK`, are all set by `infra/worker.tofu`.
+`AE_SQL_TOKEN` (Account Analytics Read, passed in as `ae_sql_token`) and `ACCOUNT_ID` for the daily rollup, and optionally `ALERT_WEBHOOK`, are all set by `infra/worker.tofu` on the ingest Worker.

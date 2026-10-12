@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import headers from "../../dashboard/_headers?raw";
+import publicHeaders from "../../public/_headers?raw";
 import type { Env } from "../src/env";
 import worker from "../src/index";
 
@@ -31,5 +32,9 @@ describe("security headers", () => {
     expect(headers).toContain(`Content-Security-Policy: ${CSP}`);
     expect(headers).toContain("X-Content-Type-Options: nosniff");
     expect(headers).toContain("Referrer-Policy: no-referrer");
+  });
+
+  it("sends the same headers for the public page assets", () => {
+    expect(publicHeaders).toBe(headers);
   });
 });
