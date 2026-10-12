@@ -53,6 +53,7 @@ describe("POST /v1/event", () => {
       "0",
       "0",
       JSON.stringify(payload().config),
+      "",
     ]);
   });
 
@@ -228,6 +229,28 @@ describe("fingerprints", () => {
     const b = await fpOf({ pkgVersion: "1.3.0", graphqlMajor: 17 });
     expect(b.fp).not.toBe(a.fp);
     expect(b.fpShape).toBe(a.fpShape);
+  });
+
+  it("changes both on a different event or target", async () => {
+    const a = await fpOf({});
+    const b = await fpOf({ event: "create_scaffold", target: "hugo" });
+    const c = await fpOf({ event: "create_wire", target: "hugo" });
+    const d = await fpOf({ event: "create_wire", target: "mkdocs" });
+    for (const [x, y] of [[a, b], [b, c], [c, d]]) {
+      expect(x.fp).not.toBe(y.fp);
+      expect(x.fpShape).not.toBe(y.fpShape);
+    }
+  });
+
+  it("stores the create target as the last blob", async () => {
+    const { env, events } = mockEnv();
+    await worker.fetch(
+      post(JSON.stringify(payload({ event: "create_scaffold", target: "hugo" })), JSON_HEADERS),
+      env,
+    );
+    const blobs: string[] = events.writeDataPoint.mock.calls[0][0].blobs;
+    expect(blobs).toHaveLength(19);
+    expect(blobs[18]).toBe("hugo");
   });
 
   it("changes both on a config change", async () => {

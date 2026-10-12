@@ -20,7 +20,8 @@ const MAX_CONFIG_JSON = 3000;
  * Blob order of a `gqlmd_events` data point (index 0 first):
  * event, fp, fpShape, pkg, pkgVersion, formatter, loader kinds (comma-joined),
  * os, pm, nodeMajor, graphqlMajor, ci, ciProvider, trigger, container, wsl,
- * quarantined, sanitized config JSON. Booleans are "1" or "0".
+ * quarantined, sanitized config JSON, target (create preset, else ""; blob19).
+ * Booleans are "1" or "0".
  */
 export const buildBlobs = (
   payload: Json,
@@ -49,6 +50,7 @@ export const buildBlobs = (
     flag(payload.wsl),
     flag(quarantined),
     configJson.length > MAX_CONFIG_JSON ? '{"truncated":true}' : configJson,
+    String(payload.target ?? ""),
   ];
 };
 

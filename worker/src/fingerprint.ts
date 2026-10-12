@@ -45,12 +45,15 @@ export const formatterOf = (payload: Json): string => {
  * Server-side fingerprints over the project-describing fields only: masked
  * config, loader kinds, formatter, pkgVersion and graphqlMajor. Per-machine
  * fields (os, nodeMajor, pm, ci, ciProvider, container, wsl, firstRun,
- * trigger) are excluded. `fpShape` also drops pkgVersion and graphqlMajor.
+ * trigger) are excluded. `event` and `target` are included so create
+ * events do not share a bucket with config events or each other. `fpShape` also drops pkgVersion and graphqlMajor.
  */
 export const fingerprints = async (
   payload: Json,
 ): Promise<{ fp: string; fpShape: string }> => {
   const shape = {
+    event: payload.event,
+    target: payload.target ?? null,
     config: payload.config ?? null,
     loader: payload.loader ?? null,
     formatter: formatterOf(payload),
