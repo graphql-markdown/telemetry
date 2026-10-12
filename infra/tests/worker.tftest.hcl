@@ -1,6 +1,21 @@
 # Plan-only tests: mocked providers, no credentials. Run with `tofu test`.
 
-mock_provider "cloudflare" {}
+mock_provider "cloudflare" {
+  # The mocked list data source returns no items by default; give the token
+  # policy a permission group to reference.
+  override_data {
+    target = data.cloudflare_api_token_permission_groups_list.analytics_read
+    values = {
+      result = [{
+        id            = "00000000000000000000000000000001"
+        name          = "Account Analytics Read"
+        category      = "Analytics"
+        is_selectable = true
+        scopes        = ["com.cloudflare.api.account"]
+      }]
+    }
+  }
+}
 
 variables {
   account_id           = "00000000000000000000000000000000"
