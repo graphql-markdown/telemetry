@@ -35,9 +35,22 @@
       "namespace_id": "1002",
       "simple": { "limit": 1000, "period": 60 }
     }
-  ]
+  ],
 
-  // Bindings are declared in later PRs:
-  // "d1_databases": [{ "binding": "DB", "database_name": "gqlmd-telemetry", "database_id": "..." }],
-  // "triggers": { "crons": ["0 3 * * *"] },
+  // Daily rollup target. database_id is a placeholder for local and test runs;
+  // the deployed binding is created by infra/worker.tofu.
+  // Migrations: `wrangler d1 migrations apply gqlmd-telemetry --remote`.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gqlmd-telemetry",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../migrations"
+    }
+  ],
+
+  // Rollup of day D-1 (UTC).
+  "triggers": { "crons": ["0 2 * * *"] }
+
+  // Secrets (not in this file): AE_SQL_TOKEN, ACCOUNT_ID, ALERT_WEBHOOK.
 }
