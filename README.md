@@ -125,7 +125,7 @@ Then in the dashboard go to R2 > Manage API tokens and create an S3 credential w
 
 ### 4. GitHub secrets and variables
 
-Add these under Settings > Secrets and variables > Actions. The names match the tofu variables (`TF_VAR_<name>`) and the commented-out apply step in `.github/workflows/ci.yml`:
+Add these under Settings > Secrets and variables > Actions. The names match the tofu variables (`TF_VAR_<name>`) and the `deploy` job in `.github/workflows/ci.yml`. Put them at repository level or in the `production` environment the job uses:
 
 | Name | Kind | Used for |
 | --- | --- | --- |
@@ -141,7 +141,7 @@ Add these under Settings > Secrets and variables > Actions. The names match the 
 | `ACCESS_AUD` | variable | `access_aud`, the AUD tag of the Access application (step 5) |
 | `DASHBOARD_EMAILS` | variable | `dashboard_emails`, a JSON list such as `["you@example.com"]` |
 
-The workflow does not apply infrastructure yet, so these are only read by a future apply job. For manual runs, export the same values as `TF_VAR_account_id`, `TF_VAR_workers_subdomain`, `TF_VAR_cloudflare_api_token`, `TF_VAR_state_passphrase`, `TF_VAR_ae_sql_token`, `TF_VAR_access_team_domain`, `TF_VAR_access_aud` and `TF_VAR_dashboard_emails` (and optionally `TF_VAR_alert_webhook`, `TF_VAR_public_stats`).
+Only the `deploy` job reads them. For manual runs, export the same values as `TF_VAR_account_id`, `TF_VAR_workers_subdomain`, `TF_VAR_cloudflare_api_token`, `TF_VAR_state_passphrase`, `TF_VAR_ae_sql_token`, `TF_VAR_access_team_domain`, `TF_VAR_access_aud` and `TF_VAR_dashboard_emails` (and optionally `TF_VAR_alert_webhook`, `TF_VAR_public_stats`).
 
 ### 5. Initialise and apply the infrastructure
 
@@ -178,7 +178,11 @@ export CLOUDFLARE_ACCOUNT_ID=<account id>
 scripts/deploy.sh
 ```
 
-The script reads `d1_database_id` and `quarantine_kv_id` from the tofu output, writes a temporary copy of `worker/wrangler.jsonc` with the real D1 and KV ids (and the same for `worker/wrangler.dashboard.jsonc`), runs `wrangler deploy` for both configs and `wrangler d1 migrations apply gqlmd-telemetry --remote` once, then deletes the copies. It needs `tofu` initialised in `infra/`. Run it again after each Worker change or new file in `migrations/`.
+The script reads `d1_database_id` and `quarantine_kv_id` from the tofu output, writes a temporary copy of `worker/wrangler.jsonc` with the real D1 and KV ids (and the same for `worker/wrangler.dashboard.jsonc`), runs `wrangler deploy` for both configs and `wrangler d1 migrations apply gqlmd-telemetry --remote` once, then deletes the copies. It needs `tofu` initialised in `infra/`. Run it again after each Worker change or new file in `migrations/`, or let CI do it (below).
+
+### Deploy from CI
+
+The `deploy` job in `.github/workflows/ci.yml` runs steps 5 and 6 (`tofu plan`, `tofu apply` of that saved plan, then `scripts/deploy.sh`) with the secrets and variables from step 4. It never runs on its own: open Actions > CI > Run workflow on `main`. It waits for the typecheck, test and OpenTofu jobs, and writes the plan to the run summary. The apply does not pause for review; to require an approval before the job starts, add required reviewers to the `production` environment (Settings > Environments). The first setup (two applies around the Access toggle) is still done by hand.
 
 ### 7. Verify
 
