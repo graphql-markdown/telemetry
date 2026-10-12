@@ -28,6 +28,7 @@ beforeEach(async () => {
   await db.batch([
     db.prepare("DELETE FROM daily_counts"),
     db.prepare("DELETE FROM config_catalog"),
+    db.prepare("DELETE FROM config_catalog_daily"),
     db.prepare("DELETE FROM rejects_daily"),
   ]);
   resetAccessCache();
@@ -140,23 +141,43 @@ describe("GET /v1/stats", () => {
 });
 
 describe("GET /v1/stats/catalog", () => {
-  it("returns top shapes by debounced events with n < 5 suppressed", async () => {
-    const shape = (id: string, debounced: number, last = "2026-10-20") =>
-      db
-        .prepare(
-          "INSERT INTO config_catalog VALUES (?, ?, '1.0.0,1.1.0', '2026-10-01', ?, ?, ?, ?)",
-        )
-        .bind(id, JSON.stringify({ formatter: id }), last, debounced * 2, debounced, last);
+  const shape = (id: string, allTime: number) =>
+    db
+      .prepare(
+        "INSERT INTO config_catalog VALUES (?, ?, '1.0.0,1.1.0', '2026-01-01', '2026-10-20', ?, ?, '2026-10-20')",
+      )
+      .bind(id, JSON.stringify({ formatter: id }), allTime * 2, allTime);
+  const daily = (day: string, id: string, debounced: number, ci = "0") =>
+    db
+      .prepare("INSERT INTO config_catalog_daily VALUES (?, ?, ?, ?, ?)")
+      .bind(day, id, ci, debounced * 2, debounced);
+
+  it("suppresses within the range, not on all-time totals, and ranks by in-range counts", async () => {
     await db.batch([
       shape("a", 9),
       shape("b", 20),
-      shape("c", 4),
-      shape("old", 50, "2026-01-01"),
+      shape("c", 10),
+      shape("d", 50),
+      daily("2026-10-02", "a", 9),
+      daily("2026-10-03", "b", 20),
+      daily("2026-10-04", "c", 1),
+      daily("2026-09-01", "c", 9),
+      daily("2026-10-05", "d", 3),
+      daily("2026-10-06", "d", 3),
     ]);
     const body = (await (await get(`/v1/stats/catalog?${Q}`, token)).json()) as any;
-    expect(body.configs.map((c: any) => c.config.formatter)).toEqual(["b", "a"]);
+    expect(body.configs.map((c: any) => c.config.formatter)).toEqual(["b", "a", "d"]);
+    expect(body.configs[2].debounced_events).toBe(6);
     expect(body.configs[0].versions).toEqual(["1.0.0", "1.1.0"]);
     expect(body.suppressed_count).toBe(1);
+  });
+
+  it("filters by view", async () => {
+    await db.batch([shape("a", 9), daily("2026-10-02", "a", 9, "1")]);
+    const local = (await (await get(`/v1/stats/catalog?${Q}`, token)).json()) as any;
+    expect(local.configs).toHaveLength(0);
+    const ci = (await (await get(`/v1/stats/catalog?${Q}&view=ci`, token)).json()) as any;
+    expect(ci.configs).toHaveLength(1);
   });
 });
 

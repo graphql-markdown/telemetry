@@ -123,18 +123,26 @@ export const statsFor = async (env: Env, query: Query, weekly = false): Promise<
   });
 };
 
-/** Top masked config shapes by debounced events; shapes under MIN_COUNT hidden. */
+/**
+ * Top masked config shapes by in-range debounced events. Daily rows are summed
+ * over the range first, then shapes under MIN_COUNT are hidden.
+ */
 const catalog = async (env: Env, params: URLSearchParams): Promise<Response> => {
   const range = parseRange(params);
   if (!range.ok) return bad(range.error);
+  const view = oneOf(VIEWS, params.get("view"), "local");
+  if (view === undefined) return bad("invalid view");
   const { from, to } = range.value;
-  const overlap = "last_seen >= ?1 AND first_seen <= ?2";
+  const [ciA, ciB] = ciOf(view);
+  const ranged = `SELECT fp_shape, SUM(events) AS events, SUM(debounced_events) AS debounced_events
+     FROM config_catalog_daily WHERE day BETWEEN ?1 AND ?2 AND ci IN (?3, ?4) GROUP BY fp_shape`;
   const { results } = await env.DB.prepare(
-    `SELECT masked_config_json, versions_seen, first_seen, last_seen, events, debounced_events
-     FROM config_catalog WHERE ${overlap} AND debounced_events >= ?3
-     ORDER BY debounced_events DESC LIMIT ?4`,
+    `SELECT c.masked_config_json, c.versions_seen, c.first_seen, c.last_seen, r.events, r.debounced_events
+     FROM (${ranged}) r JOIN config_catalog c ON c.fp_shape = r.fp_shape
+     WHERE r.debounced_events >= ?5
+     ORDER BY r.debounced_events DESC LIMIT ?6`,
   )
-    .bind(from, to, MIN_COUNT, CATALOG_LIMIT)
+    .bind(from, to, ciA, ciB, MIN_COUNT, CATALOG_LIMIT)
     .all<{
       masked_config_json: string;
       versions_seen: string;
@@ -144,9 +152,9 @@ const catalog = async (env: Env, params: URLSearchParams): Promise<Response> => 
       debounced_events: number;
     }>();
   const hidden = await env.DB.prepare(
-    `SELECT COUNT(*) AS c FROM config_catalog WHERE ${overlap} AND debounced_events < ?3`,
+    `SELECT COUNT(*) AS c FROM (${ranged}) WHERE debounced_events < ?5`,
   )
-    .bind(from, to, MIN_COUNT)
+    .bind(from, to, ciA, ciB, MIN_COUNT)
     .first<{ c: number }>();
   return json({
     from,
