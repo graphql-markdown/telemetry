@@ -126,6 +126,12 @@ resource "cloudflare_workers_script" "telemetry" {
       text = var.public_stats
     },
   ] # verify: binding attribute names (namespace_id, simple) against the v5 schema
+
+  # wrangler deploy owns the bundle and the static assets after the first deploy;
+  # tofu keeps the bindings and vars but must not overwrite the uploaded script.
+  lifecycle {
+    ignore_changes = [content]
+  }
 }
 
 # Daily rollup of day D-1 (UTC).

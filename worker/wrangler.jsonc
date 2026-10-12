@@ -58,8 +58,10 @@
   },
 
   // Access verification (second check) and the optional public aggregates.
-  // Values come from infra/worker.tofu in production.
-  "vars": { "ACCESS_TEAM_DOMAIN": "", "ACCESS_AUD": "", "PUBLIC_STATS": "false" },
+  // ACCESS_TEAM_DOMAIN and ACCESS_AUD are set by infra/worker.tofu and kept across
+  // deploys by keep_vars; local defaults live in worker/.dev.vars.example.
+  "vars": { "PUBLIC_STATS": "false" },
+  "keep_vars": true,
 
   // Rollup of day D-1 (UTC).
   "triggers": { "crons": ["0 2 * * *"] }

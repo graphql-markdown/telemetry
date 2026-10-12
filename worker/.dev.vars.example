@@ -1,0 +1,4 @@
+# Local-dev defaults. Copy to worker/.dev.vars (gitignored).
+# In production these two are set by tofu (infra/worker.tofu) and kept by keep_vars.
+ACCESS_TEAM_DOMAIN=example.cloudflareaccess.com
+ACCESS_AUD=local-dev-aud

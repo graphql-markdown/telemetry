@@ -70,19 +70,23 @@ Notes:
    tofu init -backend-config="endpoints={s3=\"https://<account id>.r2.cloudflarestorage.com\"}"
    ```
 
-3. **Apply the infrastructure.** This creates the Worker, the D1 database, the Access application and the Worker secrets:
+3. **Apply the infrastructure first.** This creates the Worker, the D1 database, the Access application, the Worker secrets and the Access vars (`ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`):
 
    ```sh
    tofu apply
    ```
 
-4. **Apply the D1 migrations.** Run this after `tofu apply`, and again after each new file in `migrations/`:
+   `cloudflare_workers_script` has `lifecycle { ignore_changes = [content] }`, so later applies do not overwrite the bundle and assets uploaded by `wrangler deploy`. If you remove that block, run `tofu apply` with `-target` so it excludes the script content after the first deploy.
+
+4. **Deploy the Worker** from `worker/` with `wrangler deploy`. It uploads the script and the static assets, and `keep_vars` preserves the tofu-set vars.
+
+5. **Apply the D1 migrations.** Run this after the deploy, and again after each new file in `migrations/`:
 
    ```sh
    bunx wrangler d1 migrations apply gqlmd-telemetry --remote --config worker/wrangler.jsonc
    ```
 
-5. **Deploy the Worker** from `worker/` through the usual pipeline (`wrangler deploy`).
+   For local development, copy `worker/.dev.vars.example` to `worker/.dev.vars` (gitignored).
 
 Required GitHub repository secrets:
 
