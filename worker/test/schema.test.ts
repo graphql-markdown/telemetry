@@ -264,7 +264,8 @@ describe("validate: closed sets for free-text channels", () => {
   });
 
   it("limits key tokens, array length and object size", () => {
-    expect(validate(withConfig({ metatags: [{ "<key:999>": "<string>" }] })).ok).toBe(false);
+    expect(validate(withConfig({ metatags: [{ "<key:999>": "<string>" }] })).ok).toBe(true);
+    expect(validate(withConfig({ metatags: [{ "<key:1234567>": "<string>" }] })).ok).toBe(false);
     expect(validate(withConfig({ metatags: [{ "<key:99>": "<string>" }] })).ok).toBe(true);
     expect(validate(withConfig({ skipDocDirective: Array(50).fill("<string>") })).ok).toBe(true);
     const wide = Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`<key:${i}>`, "<string>"]));
@@ -276,6 +277,13 @@ describe("validate: closed sets for free-text channels", () => {
       ok: true,
       value: { config: { id: null, force: null } },
     });
+  });
+
+  it("accepts a 120-entry map and stores 50 keys", () => {
+    const wide = Object.fromEntries(Array.from({ length: 120 }, (_, i) => [`<key:${i}>`, "<string>"]));
+    const res = validate(withConfig({ metatags: wide })) as any;
+    expect(res.ok).toBe(true);
+    expect(Object.keys(res.value.config.metatags)).toHaveLength(50);
   });
 
   it("truncates arrays and objects over 50 entries", () => {

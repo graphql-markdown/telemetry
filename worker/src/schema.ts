@@ -106,7 +106,7 @@ export const MASK_TOKENS = [
   "<number>",
 ] as const;
 /** Pattern of masked object keys, e.g. `<key:0>`. */
-export const KEY_TOKEN_PATTERN = "^<key:\\d{1,2}>$";
+export const KEY_TOKEN_PATTERN = "^<key:\\d{1,6}>$";
 
 export const ALLOWLIST = {
   events: EVENTS,
