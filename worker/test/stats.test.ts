@@ -127,6 +127,7 @@ describe("GET /v1/stats", () => {
       count("2026-10-05", "1", "os", "linux", "raw", 20),
       count("2026-10-05", "0", "os", "linux", "debounced_1d", 7),
       count("2026-10-05", "0", "os", "linux", "quarantined", 6),
+      count("2026-10-05", "0", "os", "linux", "colo_sampled", 9),
       count("2026-09-05", "0", "os", "linux", "raw", 100),
     ]);
     const total = async (query: string) =>
@@ -137,6 +138,14 @@ describe("GET /v1/stats", () => {
     expect(await total("view=all")).toBe(30);
     expect(await total("measure=debounced_1d")).toBe(7);
     expect(await total("measure=quarantined")).toBe(6);
+    expect(await total("measure=colo_sampled")).toBe(9);
+  });
+
+  it("accepts the target dimension", async () => {
+    await db.batch([count("2026-10-05", "0", "target", "docusaurus", "raw", 8)]);
+    const res = await get(`/v1/stats?dim=target&${Q}`, token);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as any).totals[0]).toMatchObject({ value: "docusaurus", n: 8 });
   });
 });
 

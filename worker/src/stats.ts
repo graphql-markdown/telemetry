@@ -19,8 +19,9 @@ export const DIMS = [
   "ciProvider",
   "trigger",
   "container",
+  "target",
 ] as const;
-export const MEASURES = ["raw", "debounced_1h", "debounced_1d", "quarantined"] as const;
+export const MEASURES = ["raw", "debounced_1h", "debounced_1d", "quarantined", "colo_sampled"] as const;
 export const VIEWS = ["local", "ci", "all"] as const;
 
 const SETTING_DIM = /^setting\.[A-Za-z][A-Za-z0-9]{0,63}$/;

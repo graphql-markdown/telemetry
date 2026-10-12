@@ -21,7 +21,7 @@
 
   function params() {
     var kind = form.elements.measure.value;
-    var measure = kind === "events" ? "raw" : kind === "configs" ? "debounced_1d" : "debounced_" + document.getElementById("interval").value;
+    var measure = kind === "events" ? "raw" : kind === "configs" ? "debounced_1d" : kind === "colo_sampled" ? "colo_sampled" : "debounced_" + document.getElementById("interval").value;
     return { from: form.elements.from.value, to: form.elements.to.value, measure: measure, view: form.elements.view.value };
   }
 

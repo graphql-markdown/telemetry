@@ -25,10 +25,10 @@ describe("dashboard assets", () => {
   });
 
   it("has the toggles, range picker and every panel", () => {
-    for (const needle of ['id="from"', 'id="to"', 'value="events"', 'value="debounced"', 'value="configs"', 'value="local"', 'value="ci"', 'value="all"']) {
+    for (const needle of ['id="from"', 'id="to"', 'value="events"', 'value="debounced"', 'value="configs"', 'value="colo_sampled"', 'value="local"', 'value="ci"', 'value="all"']) {
       expect(html).toContain(needle);
     }
-    for (const panel of ["versions", "ci", "provider", "formatter", "graphql", "loader", "create", "settings", "catalog", "health"]) {
+    for (const panel of ["versions", "ci", "provider", "formatter", "graphql", "loader", "create", "targets", "settings", "catalog", "health"]) {
       expect(html).toContain(`data-panel="${panel}"`);
     }
   });
