@@ -58,10 +58,14 @@ variable "access_team_domain" {
   type        = string
 }
 
-variable "access_aud_override" {
-  description = "AUD tag of an Access application created by hand. Only for when the provider rejects a workers.dev destination (see README). Null uses the tofu-managed application."
+variable "access_aud" {
+  description = "AUD tag of the Access application created by the workers.dev toggle (see README). Any non-empty placeholder works for the first apply."
   type        = string
-  default     = null
+
+  validation {
+    condition     = length(var.access_aud) > 0
+    error_message = "access_aud must not be empty."
+  }
 }
 
 variable "public_stats" {

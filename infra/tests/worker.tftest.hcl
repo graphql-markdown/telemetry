@@ -9,6 +9,7 @@ variables {
   ae_sql_token         = "dummy-read-token"
   state_passphrase     = "dummy-passphrase-0123456789"
   dashboard_emails     = ["me@example.test"]
+  access_aud           = "dummy-aud"
   access_team_domain   = "team.cloudflareaccess.com"
   worker_bundle_path   = "tests/fixtures/worker.js"
 }
@@ -151,26 +152,28 @@ run "empty_ae_sql_token_rejected" {
   expect_failures = [var.ae_sql_token]
 }
 
-run "access_application" {
+run "access_policy_and_idp" {
   command = plan
-
-  assert {
-    condition     = [for d in cloudflare_zero_trust_access_application.dashboard.destinations : d.uri] == ["gqlmd-telemetry-dashboard.${var.workers_subdomain}.workers.dev"]
-    error_message = "Access must cover exactly the dashboard host, with no paths" # verify: destinations shape
-  }
-
-  assert {
-    condition = alltrue([
-      for d in cloudflare_zero_trust_access_application.dashboard.destinations :
-      !strcontains(d.uri, "/") && !strcontains(d.uri, "gqlmd-telemetry.")
-    ])
-    error_message = "Access must not cover the ingest host or any path"
-  }
 
   assert {
     condition     = length(cloudflare_zero_trust_access_policy.dashboard.include) == length(var.dashboard_emails)
     error_message = "policy must include exactly var.dashboard_emails" # verify: include shape
   }
+
+  assert {
+    condition     = cloudflare_zero_trust_access_identity_provider.otp.type == "onetimepin"
+    error_message = "the identity provider must be one-time PIN"
+  }
+}
+
+run "empty_access_aud_rejected" {
+  command = plan
+
+  variables {
+    access_aud = ""
+  }
+
+  expect_failures = [var.access_aud]
 }
 
 run "empty_dashboard_emails_rejected" {
@@ -191,4 +194,13 @@ run "empty_workers_subdomain_rejected" {
   }
 
   expect_failures = [var.workers_subdomain]
+}
+
+run "d1_read_replication_disabled" {
+  command = plan
+
+  assert {
+    condition     = cloudflare_d1_database.telemetry.read_replication.mode == "disabled"
+    error_message = "D1 read replication must be set explicitly to disabled"
+  }
 }
