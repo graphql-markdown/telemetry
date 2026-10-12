@@ -147,6 +147,25 @@
     section.appendChild(suppressedNote(data.suppressed_count));
   }
 
+  function renderGenerate(section, data) {
+    if (data.runs === null && !data.versions.length) {
+      section.appendChild(el("p", "No data (suppressed or empty).", "note"));
+    } else {
+      var dash = function (v) { return v === null ? "-" : fmt(v); };
+      section.appendChild(table(["Metric", "p50", "p95"], [
+        ["Duration (ms)", dash(data.duration_p50), dash(data.duration_p95)],
+        ["Pages", dash(data.pages_p50), dash(data.pages_p95)],
+      ], 1));
+      var rows = data.versions.map(function (v) { return [v.version, fmt(v.runs), fmt(v.failures), (v.failure_rate * 100).toFixed(1) + "%"]; });
+      section.appendChild(table(["Version", "Runs", "Failures", "Failure rate"], rows, 1));
+      if (data.errors.length) {
+        section.appendChild(details("Top error types", bars(data.errors.map(function (e) { return { value: e.error_type, n: e.runs }; }), function (v) { return v; })));
+      }
+      section.appendChild(el("p", "Percentiles are run-weighted averages of daily values.", "note"));
+    }
+    section.appendChild(suppressedNote(data.suppressed_count));
+  }
+
   function renderHealth(section, query) {
     return Promise.all([
       get("/v1/stats/rejects", { from: query.from, to: query.to }),
@@ -168,6 +187,7 @@
     var done;
     if (kind === "settings") done = renderSettings(section, q);
     else if (kind === "health") done = renderHealth(section, q);
+    else if (kind === "generate") done = get("/v1/stats/generate", { from: q.from, to: q.to, view: q.view }).then(function (d) { renderGenerate(section, d); });
     else if (kind === "catalog") done = get("/v1/stats/catalog", { from: q.from, to: q.to }).then(function (d) { renderCatalog(section, d); });
     else done = get("/v1/stats", Object.assign({ dim: section.dataset.dim }, q)).then(function (d) {
       (kind === "series" ? renderSeries : renderShare)(section, d);

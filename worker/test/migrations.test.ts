@@ -12,7 +12,7 @@ describe("migrations", () => {
       .all<{ name: string }>();
     const names = results.map((row) => row.name);
     expect(names).toEqual(
-      expect.arrayContaining(["config_catalog", "daily_counts", "rejects_daily"]),
+      expect.arrayContaining(["config_catalog", "daily_counts", "rejects_daily", "generate_daily", "generate_errors_daily"]),
     );
   });
 

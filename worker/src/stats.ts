@@ -203,7 +203,76 @@ const rejects = async (env: Env, params: URLSearchParams): Promise<Response> => 
   });
 };
 
-/** Handles `/v1/stats`, `/v1/stats/catalog` and `/v1/stats/rejects` (GET, already authorized). */
+/** Run-weighted mean of a quantile column. */
+const weighted = (rows: Array<{ runs: number } & Record<string, number>>, key: string): number | null => {
+  let sum = 0;
+  let weight = 0;
+  for (const row of rows) {
+    sum += row[key] * row.runs;
+    weight += row.runs;
+  }
+  return weight === 0 ? null : Math.round(sum / weight);
+};
+
+/**
+ * Generate stats over the range: failure rate by version, top error types and
+ * run-weighted p50/p95 of duration and pages (an approximation of the true
+ * quantiles). Versions, error types and the quantiles are hidden when their
+ * summed runs over the range are under MIN_COUNT.
+ */
+const generate = async (env: Env, params: URLSearchParams): Promise<Response> => {
+  const range = parseRange(params);
+  if (!range.ok) return bad(range.error);
+  const view = oneOf(VIEWS, params.get("view"), "local");
+  if (view === undefined) return bad("invalid view");
+  const { from, to } = range.value;
+  const [ciA, ciB] = ciOf(view);
+  const { results } = await env.DB.prepare(
+    `SELECT pkg_version, SUM(runs) AS runs, SUM(failures) AS failures,
+       SUM(pages_p50 * runs) / SUM(runs) AS pages_p50, SUM(pages_p95 * runs) / SUM(runs) AS pages_p95,
+       SUM(duration_p50 * runs) / SUM(runs) AS duration_p50, SUM(duration_p95 * runs) / SUM(runs) AS duration_p95
+     FROM generate_daily WHERE day BETWEEN ?1 AND ?2 AND ci IN (?3, ?4) GROUP BY pkg_version`,
+  )
+    .bind(from, to, ciA, ciB)
+    .all<{ pkg_version: string; runs: number; failures: number; pages_p50: number; pages_p95: number; duration_p50: number; duration_p95: number }>();
+  const all = await env.DB.prepare(
+    "SELECT runs, pages_p50, pages_p95, duration_p50, duration_p95 FROM generate_daily WHERE day BETWEEN ?1 AND ?2 AND ci IN (?3, ?4)",
+  )
+    .bind(from, to, ciA, ciB)
+    .all<{ runs: number; pages_p50: number; pages_p95: number; duration_p50: number; duration_p95: number }>();
+  const errors = await env.DB.prepare(
+    `SELECT error_type, SUM(runs) AS runs FROM generate_errors_daily WHERE day BETWEEN ?1 AND ?2
+     GROUP BY error_type ORDER BY runs DESC`,
+  )
+    .bind(from, to)
+    .all<{ error_type: string; runs: number }>();
+  const shown = results.filter((row) => row.runs >= MIN_COUNT);
+  const total = results.reduce((sum, row) => sum + row.runs, 0);
+  const visible = total >= MIN_COUNT;
+  const shownErrors = errors.results.filter((row) => row.runs >= MIN_COUNT);
+  return json({
+    from,
+    to,
+    view,
+    runs: visible ? total : null,
+    duration_p50: visible ? weighted(all.results, "duration_p50") : null,
+    duration_p95: visible ? weighted(all.results, "duration_p95") : null,
+    pages_p50: visible ? weighted(all.results, "pages_p50") : null,
+    pages_p95: visible ? weighted(all.results, "pages_p95") : null,
+    versions: shown.map((row) => ({
+      version: row.pkg_version,
+      runs: row.runs,
+      failures: row.failures,
+      failure_rate: row.runs === 0 ? 0 : row.failures / row.runs,
+    })),
+    errors: shownErrors.map((row) => ({ error_type: row.error_type, runs: row.runs })),
+    suppressed_count:
+      results.length - shown.length + errors.results.length - shownErrors.length,
+    min_count: MIN_COUNT,
+  });
+};
+
+/** Handles `/v1/stats`, `/v1/stats/catalog`, `/v1/stats/rejects` and `/v1/stats/generate` (GET, already authorized). */
 export const handleStats = async (url: URL, env: Env): Promise<Response> => {
   switch (url.pathname) {
     case "/v1/stats": {
@@ -214,6 +283,8 @@ export const handleStats = async (url: URL, env: Env): Promise<Response> => {
       return catalog(env, url.searchParams);
     case "/v1/stats/rejects":
       return rejects(env, url.searchParams);
+    case "/v1/stats/generate":
+      return generate(env, url.searchParams);
     default:
       return new Response("Not Found", { status: 404 });
   }

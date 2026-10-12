@@ -17,6 +17,8 @@ const keyOf = (sql: string): string => {
   if (sql.includes("blob17 = '1'")) return "quarantined";
   if (sql.includes("blob17 = '2'")) return `colo:${/SELECT (blob\d+) AS value/.exec(sql)?.[1]}`;
   if (sql.includes("AS fp_shape")) return "catalog";
+  if (sql.includes("AS error_type")) return "generate_errors";
+  if (sql.includes("AS pages_p50")) return "generate";
   return /SELECT (blob\d+) AS value/.exec(sql)?.[1] ?? "unknown";
 };
 
@@ -88,6 +90,8 @@ beforeEach(async () => {
     db.prepare("DELETE FROM config_catalog"),
     db.prepare("DELETE FROM rejects_daily"),
     db.prepare("DELETE FROM config_catalog_daily"),
+    db.prepare("DELETE FROM generate_daily"),
+    db.prepare("DELETE FROM generate_errors_daily"),
   ]);
 });
 
@@ -318,6 +322,46 @@ describe("rollupDay", () => {
   it("throws when the SQL API fails", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 500 }));
     await expect(rollupDay(makeEnv(), DAY)).rejects.toThrow("500");
+  });
+});
+
+describe("generate rollup", () => {
+  const generateFixtures: Fixtures = {
+    generate: [
+      {
+        version: "1.0.0", trigger: "cli", ci: "1", runs: 40, failures: 4,
+        pages_p50: 10, pages_p95: 90, duration_p50: 1200, duration_p95: 8000,
+      },
+    ],
+    generate_errors: [{ version: "1.0.0", error_type: "post:TypeError", runs: 4 }],
+  };
+
+  it("queries clean generate events with weighted quantiles", async () => {
+    mockAe(generateFixtures);
+    await rollupDay(makeEnv(), DAY);
+    const sql = sqls.find((q) => q.includes("AS pages_p50")) ?? "";
+    expect(sql).toContain("blob1 = 'generate'");
+    expect(sql).toContain("blob17 = '0'");
+    expect(sql).toContain("quantileWeighted(0.95)(double3, _sample_interval * double1)");
+    expect(sql).toContain("quantileWeighted(0.5)(double2, _sample_interval * double1)");
+    const errors = sqls.find((q) => q.includes("AS error_type")) ?? "";
+    expect(errors).toContain("blob20 != ''");
+    expect(errors).toContain("blob17 = '0'");
+  });
+
+  it("fills the generate tables idempotently", async () => {
+    mockAe(generateFixtures);
+    await rollupDay(makeEnv(), DAY);
+    await rollupDay(makeEnv(), DAY);
+    const daily = (await db.prepare("SELECT * FROM generate_daily").all()).results;
+    expect(daily).toEqual([
+      {
+        day: DAY, pkg_version: "1.0.0", trigger: "cli", ci: "1", runs: 40, failures: 4,
+        pages_p50: 10, pages_p95: 90, duration_p50: 1200, duration_p95: 8000,
+      },
+    ]);
+    const errors = (await db.prepare("SELECT * FROM generate_errors_daily").all()).results;
+    expect(errors).toEqual([{ day: DAY, pkg_version: "1.0.0", error_type: "post:TypeError", runs: 4 }]);
   });
 });
 
