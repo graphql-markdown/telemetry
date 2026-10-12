@@ -247,11 +247,20 @@ describe("validate: closed sets for free-text channels", () => {
     expect(validate(withConfig({ formatter: "@graphql-markdown/formatters/hugo" })).ok).toBe(true);
   });
 
-  it("rejects numbers other than integers 0-1000", () => {
+  it("masks numbers other than integers 0-1000 and rejects non-finite ones", () => {
     for (const n of [1234567890, -1, 1.5, 1001]) {
+      expect(validate(withConfig({ force: n }))).toMatchObject({
+        ok: true,
+        value: { config: { force: "<number>" } },
+      });
+    }
+    expect(validate(withConfig({ force: 1000 }))).toMatchObject({
+      ok: true,
+      value: { config: { force: 1000 } },
+    });
+    for (const n of [Infinity, -Infinity, NaN]) {
       expect(validate(withConfig({ force: n })).ok).toBe(false);
     }
-    expect(validate(withConfig({ force: 1000 })).ok).toBe(true);
   });
 
   it("limits key tokens, array length and object size", () => {

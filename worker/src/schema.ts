@@ -103,6 +103,7 @@ export const MASK_TOKENS = [
   "<glob>",
   "<inline-sdl>",
   "<unknown>",
+  "<number>",
 ] as const;
 /** Pattern of masked object keys, e.g. `<key:0>`. */
 export const KEY_TOKEN_PATTERN = "^<key:\\d{1,2}>$";
@@ -351,9 +352,12 @@ const sanitizeSection = (
     return value;
   }
   if (typeof value === "number") {
+    if (!Number.isFinite(value)) {
+      return FAIL;
+    }
     return Number.isInteger(value) && value >= 0 && value <= MAX_INT
       ? value
-      : FAIL;
+      : "<number>";
   }
   if (typeof value === "string") {
     if (VALUE_STRINGS.has(value) || PACKAGE_NAMES.has(value)) {
