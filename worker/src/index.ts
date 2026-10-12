@@ -13,6 +13,9 @@ const reject = (env: Env, reason: RejectReason): Response => {
 
 const flag = (value: unknown): string => (value === true ? "1" : "0");
 
+/** Blob17 values: clean, quarantined, colo-sampled. */
+export type AbuseState = "0" | "1" | "2";
+
 /** Config JSON beyond this size is replaced (AE allows 5120 bytes of blobs). */
 const MAX_CONFIG_JSON = 3000;
 
@@ -20,14 +23,16 @@ const MAX_CONFIG_JSON = 3000;
  * Blob order of a `gqlmd_events` data point (index 0 first):
  * event, fp, fpShape, pkg, pkgVersion, formatter, loader kinds (comma-joined),
  * os, pm, nodeMajor, graphqlMajor, ci, ciProvider, trigger, container, wsl,
- * quarantined, sanitized config JSON, target (create preset, else ""; blob19).
- * Booleans are "1" or "0".
+ * abuse state, sanitized config JSON, target (create preset, else ""; blob19).
+ * Booleans are "1" or "0". The abuse state (blob17) is "0" clean, "1"
+ * quarantined (per-(fp, colo) quarantine or RL_HARD flood) or "2" colo-sampled
+ * (RL_COLO tripped, kept at 1/SAMPLE_COLO with that weight).
  */
 export const buildBlobs = (
   payload: Json,
   fp: string,
   fpShape: string,
-  quarantined: boolean,
+  abuseState: AbuseState,
 ): string[] => {
   const loader = payload.loader;
   const configJson = JSON.stringify(payload.config ?? {});
@@ -48,7 +53,7 @@ export const buildBlobs = (
     String(payload.trigger),
     flag(payload.container),
     flag(payload.wsl),
-    flag(quarantined),
+    abuseState,
     configJson.length > MAX_CONFIG_JSON ? '{"truncated":true}' : configJson,
     String(payload.target ?? ""),
   ];
@@ -125,6 +130,7 @@ const coloOf = (request: Request): string => {
 
 const ingest = async (request: Request, env: Env): Promise<Response> => {
   let coloWeight = 1;
+  let coloSampled = false;
   // Cheap flood check before any body work. Independent of the payload, so
   // varying a field to get a new fp cannot bypass it. Key: colo only.
   if (
@@ -136,6 +142,7 @@ const ingest = async (request: Request, env: Env): Promise<Response> => {
       return reject(env, "sampled-out");
     }
     coloWeight = SAMPLE_COLO;
+    coloSampled = true;
   }
   const type = (request.headers.get("content-type") ?? "").toLowerCase();
   if (!type.startsWith("application/json")) {
@@ -169,7 +176,12 @@ const ingest = async (request: Request, env: Env): Promise<Response> => {
   }
   env.EVENTS.writeDataPoint({
     indexes: [fp],
-    blobs: buildBlobs(result.value, fp, fpShape, abuse.quarantined),
+    blobs: buildBlobs(
+      result.value,
+      fp,
+      fpShape,
+      abuse.quarantined ? "1" : coloSampled ? "2" : "0",
+    ),
     // Weight: 1 normally, N when kept under 1/N sampling. Queries must use
     // SUM(_sample_interval * double1), never count().
     doubles: [abuse.weight * coloWeight],
