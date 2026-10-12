@@ -96,22 +96,10 @@ jobs:
     concurrency:
       group: deploy-production
       cancel-in-progress: false
+    # Secrets are set per step, never job-wide, so `bun install` and the build never see them.
     env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       TF_IN_AUTOMATION: "1"
       TF_INPUT: "0"
-      TF_VAR_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      TF_VAR_state_passphrase: ${{ secrets.TOFU_STATE_PASSPHRASE }}
-      TF_VAR_ae_sql_token: ${{ secrets.AE_SQL_TOKEN }}
-      TF_VAR_alert_webhook: ${{ secrets.ALERT_WEBHOOK }}
-      TF_VAR_workers_subdomain: ${{ vars.WORKERS_SUBDOMAIN }}
-      TF_VAR_access_team_domain: ${{ vars.ACCESS_TEAM_DOMAIN }}
-      TF_VAR_access_aud: ${{ vars.ACCESS_AUD }}
-      TF_VAR_dashboard_emails: ${{ vars.DASHBOARD_EMAILS }}
     steps:
       - name: Checkout Code Base
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -135,23 +123,54 @@ jobs:
 
       - name: Init
         working-directory: infra
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TF_VAR_state_passphrase: ${{ secrets.TOFU_STATE_PASSPHRASE }}
         run: tofu init -backend-config="endpoints={s3=\"https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com\"}"
 
+      # The summary lists resource addresses and actions only, never attribute values
+      # (the repository is public).
       - name: Plan
         working-directory: infra
+        env: &tofu-env
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_state_passphrase: ${{ secrets.TOFU_STATE_PASSPHRASE }}
+          TF_VAR_ae_sql_token: ${{ secrets.AE_SQL_TOKEN }}
+          TF_VAR_alert_webhook: ${{ secrets.ALERT_WEBHOOK }}
+          TF_VAR_workers_subdomain: ${{ vars.WORKERS_SUBDOMAIN }}
+          TF_VAR_access_team_domain: ${{ vars.ACCESS_TEAM_DOMAIN }}
+          TF_VAR_access_aud: ${{ vars.ACCESS_AUD }}
+          TF_VAR_dashboard_emails: ${{ secrets.DASHBOARD_EMAILS }}
         run: |
           tofu plan -out=tfplan
           {
             echo '### OpenTofu plan'
-            echo '```'
-            tofu show -no-color tfplan
-            echo '```'
+            echo
+            tofu show -json tfplan | jq -r '
+              [.resource_changes[] | select(.change.actions != ["no-op"])]
+              | if length == 0 then "No changes."
+                else (["| Resource | Actions |", "| --- | --- |"]
+                  + map("| `\(.address)` | \(.change.actions | join(", ")) |"))
+                  | join("\n")
+                end'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Apply
         working-directory: infra
+        env: *tofu-env
         run: tofu apply tfplan
 
       # Deploys both Workers with the real D1/KV ids, then applies D1 migrations once.
       - name: Deploy Workers and migrations
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_state_passphrase: ${{ secrets.TOFU_STATE_PASSPHRASE }}
         run: scripts/deploy.sh

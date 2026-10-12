@@ -46,6 +46,8 @@ variable "alert_webhook" {
 variable "dashboard_emails" {
   description = "Email addresses allowed to open the dashboard (one-time PIN login)."
   type        = list(string)
+  # Kept out of plan output and CI logs (the repository is public).
+  sensitive = true
 
   validation {
     condition     = length(var.dashboard_emails) > 0

@@ -139,7 +139,7 @@ Add these under Settings > Secrets and variables > Actions. The names match the 
 | `WORKERS_SUBDOMAIN` | variable | `workers_subdomain`, the bare label such as `graphql-markdown` (not `graphql-markdown.workers.dev`) |
 | `ACCESS_TEAM_DOMAIN` | variable | `access_team_domain` |
 | `ACCESS_AUD` | variable | `access_aud`, the AUD tag of the Access application (step 5) |
-| `DASHBOARD_EMAILS` | variable | `dashboard_emails`, a JSON list such as `["you@example.com"]` |
+| `DASHBOARD_EMAILS` | secret | `dashboard_emails`, a JSON list such as `["you@example.com"]`; a secret so the addresses stay out of the public logs |
 
 Only the `deploy` job reads them. For manual runs, export the same values as `TF_VAR_account_id`, `TF_VAR_workers_subdomain`, `TF_VAR_cloudflare_api_token`, `TF_VAR_state_passphrase`, `TF_VAR_ae_sql_token`, `TF_VAR_access_team_domain`, `TF_VAR_access_aud` and `TF_VAR_dashboard_emails` (and optionally `TF_VAR_alert_webhook`, `TF_VAR_public_stats`).
 
