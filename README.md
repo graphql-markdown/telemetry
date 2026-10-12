@@ -137,9 +137,10 @@ Add these under Settings > Secrets and variables > Actions. The names match the 
 | `ALERT_WEBHOOK` | secret, optional | `alert_webhook` (no-events alert) |
 | `WORKERS_SUBDOMAIN` | variable | `workers_subdomain` |
 | `ACCESS_TEAM_DOMAIN` | variable | `access_team_domain` |
+| `ACCESS_AUD` | variable | `access_aud`, the AUD tag of the Access application (step 5) |
 | `DASHBOARD_EMAILS` | variable | `dashboard_emails`, a JSON list such as `["you@example.com"]` |
 
-The workflow does not apply infrastructure yet, so these are only read by a future apply job. For manual runs, export the same values as `TF_VAR_account_id`, `TF_VAR_workers_subdomain`, `TF_VAR_cloudflare_api_token`, `TF_VAR_state_passphrase`, `TF_VAR_ae_sql_token`, `TF_VAR_access_team_domain` and `TF_VAR_dashboard_emails` (and optionally `TF_VAR_alert_webhook`, `TF_VAR_public_stats`).
+The workflow does not apply infrastructure yet, so these are only read by a future apply job. For manual runs, export the same values as `TF_VAR_account_id`, `TF_VAR_workers_subdomain`, `TF_VAR_cloudflare_api_token`, `TF_VAR_state_passphrase`, `TF_VAR_ae_sql_token`, `TF_VAR_access_team_domain`, `TF_VAR_access_aud` and `TF_VAR_dashboard_emails` (and optionally `TF_VAR_alert_webhook`, `TF_VAR_public_stats`).
 
 ### 5. Initialise and apply the infrastructure
 
@@ -151,10 +152,22 @@ cd infra
 export AWS_ACCESS_KEY_ID=<R2 access key>
 export AWS_SECRET_ACCESS_KEY=<R2 secret>
 tofu init -backend-config="endpoints={s3=\"https://<account id>.r2.cloudflarestorage.com\"}"
-tofu apply
+tofu apply -var access_aud=pending
 ```
 
-This creates the D1 database, the quarantine KV namespace, the two Workers, their workers.dev URLs and the Access application. The ingest Worker gets the secrets and `PUBLIC_STATS`, the dashboard Worker gets `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD`. `PUBLIC_STATS` is owned by tofu (`public_stats`, default `"false"`); `keep_vars` stops `wrangler deploy` from resetting it.
+This creates the D1 database, the quarantine KV namespace, and the two Workers with their workers.dev URLs. The ingest Worker gets the secrets and `PUBLIC_STATS`, the dashboard Worker gets `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD`. `PUBLIC_STATS` is owned by tofu (`public_stats`, default `"false"`); `keep_vars` stops `wrangler deploy` from resetting it. It also creates the One-time PIN identity provider and the `gqlmd-telemetry-dashboard` Access policy.
+
+The Cloudflare API refuses an Access application on a workers.dev host (error 12130), so tofu does not create it and `access_aud` is required. The dashboard Worker must exist before its Access toggle does, hence two passes. With the placeholder `pending` the dashboard rejects every request until the real value is set:
+
+1. Enable Access on the Worker: Workers & Pages > gqlmd-telemetry-dashboard > Settings > Domains & Routes > workers.dev > Enable Cloudflare Access.
+2. In Zero Trust > Access > Applications open the application it created, set its login method to One-time PIN, attach the `gqlmd-telemetry-dashboard` policy and remove the default policy. (`tofu output access_policy_id` and `tofu output otp_idp_id` print the ids.)
+3. Copy the AUD tag (Application > Overview / Additional settings).
+4. Apply again with the real value:
+
+```sh
+export TF_VAR_access_aud=<AUD tag>
+tofu apply
+```
 
 ### 6. Deploy the Workers and migrations
 
@@ -182,8 +195,6 @@ curl -i 'https://gqlmd-telemetry-dashboard.<sub>.workers.dev/v1/stats?dim=os'
 ```
 
 Then open https://gqlmd-telemetry-dashboard.<sub>.workers.dev/ in a browser and log in with a one-time PIN sent to an address in `dashboard_emails`. The test event appears after the daily rollup (02:00 UTC) of the following day.
-
-If the provider rejects a workers.dev destination for the Access application, enable Access by hand instead: Workers & Pages > gqlmd-telemetry-dashboard > Settings > Domains & Routes > workers.dev > Enable Cloudflare Access, copy its AUD tag and pass it in as `access_aud_override` (`TF_VAR_access_aud_override`).
 
 ### 8. Enable the client
 

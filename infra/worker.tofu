@@ -7,7 +7,6 @@ locals {
   dashboard_name = "${local.worker_name}-dashboard"
   ingest_host    = "${local.worker_name}.${var.workers_subdomain}.workers.dev"
   dashboard_host = "${local.dashboard_name}.${var.workers_subdomain}.workers.dev"
-  access_aud     = coalesce(var.access_aud_override, cloudflare_zero_trust_access_application.dashboard.aud)
   bundle_path    = coalesce(var.worker_bundle_path, "${path.module}/../worker/dist/index.js")
 }
 
@@ -174,7 +173,7 @@ resource "cloudflare_workers_script" "dashboard" {
     {
       name = "ACCESS_AUD"
       type = "plain_text"
-      text = local.access_aud
+      text = var.access_aud
     },
   ] # verify: binding attribute names against the v5 schema
 

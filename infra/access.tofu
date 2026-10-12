@@ -1,7 +1,9 @@
-# Cloudflare Access (Zero Trust) in front of the whole dashboard Worker URL
-# (dashboard and stats API). The ingest Worker is a separate workers.dev URL and
-# stays public. The dashboard Worker also verifies the Access JWT itself
-# (ACCESS_TEAM_DOMAIN / ACCESS_AUD).
+# Cloudflare Access (Zero Trust) building blocks for the dashboard Worker.
+# The Access application itself is NOT managed here: the API rejects workers.dev
+# destinations (error 12130, "domain does not belong to zone"), so it is created by the
+# workers.dev toggle on the Worker (see README) and the identity provider and policy
+# below are attached to it by hand. The dashboard Worker verifies the Access JWT itself
+# (ACCESS_TEAM_DOMAIN / ACCESS_AUD). The ingest Worker stays public.
 # Prerequisite: Zero Trust is enabled on the account and its team domain set
 # (Zero Trust > Settings > Custom Pages). Attribute names follow the
 # cloudflare/cloudflare v5 provider; the uncertain ones are marked `# verify`.
@@ -24,23 +26,4 @@ resource "cloudflare_zero_trust_access_policy" "dashboard" {
       email = { email = email }
     }
   ] # verify: v5 include rule object shape
-}
-
-resource "cloudflare_zero_trust_access_application" "dashboard" {
-  account_id       = var.account_id
-  name             = "${local.worker_name}-dashboard"
-  type             = "self_hosted"
-  session_duration = "24h"
-  allowed_idps     = [cloudflare_zero_trust_access_identity_provider.otp.id]
-
-  # The whole dashboard host, no paths.
-  destinations = [
-    { type = "public", uri = local.dashboard_host },
-  ] # verify: `destinations` (v5) replaces the older `domain` attribute, and accepts a workers.dev host
-  # verify: if the provider rejects a workers.dev destination, enable Access on the Worker
-  # by hand (see README) and pass its AUD tag in as access_aud_override.
-
-  policies = [
-    { id = cloudflare_zero_trust_access_policy.dashboard.id, precedence = 1 },
-  ] # verify: v5 policy reference shape
 }
