@@ -39,7 +39,7 @@
 
   // Daily rollup target. database_id is a placeholder for local and test runs;
   // the deployed binding is created by infra/worker.tofu.
-  // Migrations: `wrangler d1 migrations apply gqlmd-telemetry --remote`.
+  // Deploy and remote migrations go through scripts/deploy.sh, which substitutes the real id.
   "d1_databases": [
     {
       "binding": "DB",
@@ -58,9 +58,8 @@
   },
 
   // Access verification (second check) and the optional public aggregates.
-  // ACCESS_TEAM_DOMAIN and ACCESS_AUD are set by infra/worker.tofu and kept across
-  // deploys by keep_vars; local defaults live in worker/.dev.vars.example.
-  "vars": { "PUBLIC_STATS": "false" },
+  // ACCESS_TEAM_DOMAIN, ACCESS_AUD and PUBLIC_STATS are set by infra/worker.tofu and
+  // kept across deploys by keep_vars; local defaults live in worker/.dev.vars.example.
   "keep_vars": true,
 
   // Rollup of day D-1 (UTC).
