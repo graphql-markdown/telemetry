@@ -136,7 +136,7 @@ Add these under Settings > Secrets and variables > Actions. The names match the 
 | `TOFU_STATE_PASSPHRASE` | secret | `state_passphrase`; keep a copy in a password manager, losing it makes the state unreadable |
 | `AE_SQL_TOKEN` | secret | `ae_sql_token`, the read-only Analytics token from step 2 |
 | `ALERT_WEBHOOK` | secret, optional | `alert_webhook` (no-events alert) |
-| `WORKERS_SUBDOMAIN` | variable | `workers_subdomain` |
+| `WORKERS_SUBDOMAIN` | variable | `workers_subdomain`, the bare label such as `graphql-markdown` (not `graphql-markdown.workers.dev`) |
 | `ACCESS_TEAM_DOMAIN` | variable | `access_team_domain` |
 | `ACCESS_AUD` | variable | `access_aud`, the AUD tag of the Access application (step 5) |
 | `DASHBOARD_EMAILS` | variable | `dashboard_emails`, a JSON list such as `["you@example.com"]` |

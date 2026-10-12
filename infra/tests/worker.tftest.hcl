@@ -196,6 +196,16 @@ run "empty_workers_subdomain_rejected" {
   expect_failures = [var.workers_subdomain]
 }
 
+run "full_workers_subdomain_rejected" {
+  command = plan
+
+  variables {
+    workers_subdomain = "graphql-markdown.workers.dev"
+  }
+
+  expect_failures = [var.workers_subdomain]
+}
+
 run "d1_read_replication_disabled" {
   command = plan
 

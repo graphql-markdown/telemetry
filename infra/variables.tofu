@@ -8,8 +8,8 @@ variable "workers_subdomain" {
   type        = string
 
   validation {
-    condition     = length(var.workers_subdomain) > 0
-    error_message = "workers_subdomain must not be empty."
+    condition     = can(regex("^[a-z0-9-]+$", var.workers_subdomain))
+    error_message = "workers_subdomain is the bare <sub> label (e.g. \"graphql-markdown\"), without dots or \".workers.dev\"."
   }
 }
 
