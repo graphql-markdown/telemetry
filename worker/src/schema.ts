@@ -8,7 +8,12 @@
  * subpath is published, and let Renovate keep it up to date.
  */
 
-export const EVENTS = ["config", "create_scaffold", "create_wire"] as const;
+export const EVENTS = [
+  "config",
+  "create_scaffold",
+  "create_wire",
+  "generate",
+] as const;
 export const TRIGGERS = [
   "cli",
   "create",
@@ -108,6 +113,29 @@ export const MASK_TOKENS = [
 /** Pattern of masked object keys, e.g. `<key:0>`. */
 export const KEY_TOKEN_PATTERN = "^<key:\\d{1,6}>$";
 
+/** Error names allowed in `errorType` (generate events only). */
+export const ERROR_TYPES = [
+  "Error",
+  "TypeError",
+  "RangeError",
+  "SyntaxError",
+  "ReferenceError",
+  "GraphQLError",
+  "AggregateError",
+  "AbortError",
+  "SystemError",
+  "<custom-error>",
+] as const;
+/**
+ * `errorType`: an allowlisted name with an optional system code suffix
+ * (`:ENOENT`), or `<no-schema>`; any of them may be prefixed with `post:`.
+ */
+export const ERROR_TYPE_PATTERN = `^(post:)?((${ERROR_TYPES.join("|")})(:E[A-Z]{1,19})?|<no-schema>)$`;
+/** Numeric bounds of the generate fields. */
+export const MAX_PAGES = 1_000_000;
+export const MAX_DURATION_MS = 86_400_000;
+const ERROR_TYPE = new RegExp(ERROR_TYPE_PATTERN);
+
 export const ALLOWLIST = {
   events: EVENTS,
   triggers: TRIGGERS,
@@ -123,6 +151,10 @@ export const ALLOWLIST = {
   knownLoaders: KNOWN_LOADERS,
   maskTokens: MASK_TOKENS,
   keyTokenPattern: KEY_TOKEN_PATTERN,
+  errorTypes: ERROR_TYPES,
+  errorTypePattern: ERROR_TYPE_PATTERN,
+  maxPages: MAX_PAGES,
+  maxDurationMs: MAX_DURATION_MS,
   graphqlMajorUnknown: "unknown",
 } as const;
 
@@ -517,6 +549,43 @@ export const validate = (payload: unknown): ValidationResult => {
       return fail("schema");
     }
     out[section] = checked;
+  }
+
+  const generate = out.event === "generate";
+  const hasGenerateField = ["pages", "durationMs", "errorType"].some(
+    (key) => payload[key] !== undefined,
+  );
+  if (!generate && hasGenerateField) {
+    return fail("schema");
+  }
+  if (generate) {
+    if (
+      payload.config !== undefined ||
+      payload.cli !== undefined ||
+      payload.loader !== undefined
+    ) {
+      return fail("schema");
+    }
+    if (!isCount(payload.pages, MAX_PAGES)) {
+      return fail("schema");
+    }
+    out.pages = payload.pages;
+    if (
+      !isCount(payload.durationMs, MAX_DURATION_MS) ||
+      payload.durationMs % 100 !== 0
+    ) {
+      return fail("schema");
+    }
+    out.durationMs = payload.durationMs;
+    if (payload.errorType !== undefined) {
+      if (
+        typeof payload.errorType !== "string" ||
+        !ERROR_TYPE.test(payload.errorType)
+      ) {
+        return fail("schema");
+      }
+      out.errorType = payload.errorType;
+    }
   }
 
   return { ok: true, value: out };

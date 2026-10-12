@@ -21,7 +21,7 @@ No personal data is collected or stored: there are no identifiers, and no IP add
    │
    │  daily cron 02:00 UTC: roll up day D-1 from Analytics Engine
    ▼
- D1  gqlmd-telemetry   daily_counts, config_catalog, rejects_daily (unlimited history)
+ D1  gqlmd-telemetry   daily_counts, config_catalog, rejects_daily, generate_daily, generate_errors_daily (unlimited history)
    │
    ├──► GET /v1/stats   JSON, Access JWT verified by the Worker
    └──► GET /           static dashboard, behind Cloudflare Access
@@ -57,6 +57,16 @@ Notes:
 - There are three measures. **Events** are raw data points, an upper bound. **Debounced** counts (1 h or 1 d windows, one per distinct config per window) are sums of daily values. **Distinct configs** (`fp_shape`) are a lower bound. The true number lies in between.
 - Quarantined rows (`blob17 = '1'`) are kept in Analytics Engine but excluded from `raw` and from the public aggregates.
 - The `n<5` rule applies after aggregation: any value with fewer than 5 events in the selected range is hidden and counted as suppressed. Do not publish per-row counts below that threshold.
+
+## Generate event
+
+`event: "generate"` (payload `v: 1`) carries the usual header fields and no `config`, `cli` or `loader` (rejected if present). Extra fields, all rejected (204, reason `schema`) on any other event:
+
+- `durationMs`: required, integer multiple of 100, 0 to 86,400,000. Stored in double3.
+- `pages`: required integer, 0 to 1,000,000. Stored in double2.
+- `errorType`: optional, failures only, stored in blob20. One anchored allowlist pattern (`ALLOWLIST.errorTypePattern`): `Error`, `TypeError`, `RangeError`, `SyntaxError`, `ReferenceError`, `GraphQLError`, `AggregateError`, `AbortError`, `SystemError` or `<custom-error>`, each with an optional `:E[A-Z]+` system code, or `<no-schema>`; any of them may be prefixed `post:`.
+
+The rollup fills `generate_daily` (runs, failures, weighted p50/p95 of pages and duration per version, trigger and ci) and `generate_errors_daily`. `GET /v1/stats/generate` serves them with the `n<5` rule applied to runs over the range.
 
 ## Testing infrastructure
 

@@ -30,6 +30,8 @@ beforeEach(async () => {
     db.prepare("DELETE FROM config_catalog"),
     db.prepare("DELETE FROM config_catalog_daily"),
     db.prepare("DELETE FROM rejects_daily"),
+    db.prepare("DELETE FROM generate_daily"),
+    db.prepare("DELETE FROM generate_errors_daily"),
   ]);
   resetAccessCache();
   await mockJwks();
@@ -187,6 +189,51 @@ describe("GET /v1/stats/catalog", () => {
     expect(local.configs).toHaveLength(0);
     const ci = (await (await get(`/v1/stats/catalog?${Q}&view=ci`, token)).json()) as any;
     expect(ci.configs).toHaveLength(1);
+  });
+});
+
+describe("GET /v1/stats/generate", () => {
+  const run = (day: string, version: string, runs: number, failures: number, ci = "0") =>
+    db
+      .prepare("INSERT INTO generate_daily VALUES (?, ?, 'cli', ?, ?, ?, 10, 100, 1000, 5000)")
+      .bind(day, version, ci, runs, failures);
+  const error = (day: string, version: string, type: string, runs: number) =>
+    db.prepare("INSERT INTO generate_errors_daily VALUES (?, ?, ?, ?)").bind(day, version, type, runs);
+
+  it("requires Access", async () => {
+    expect((await get(`/v1/stats/generate?${Q}`)).status).toBe(403);
+  });
+
+  it("suppresses versions and errors under 5 over the range, not per day", async () => {
+    await db.batch([
+      run("2026-10-05", "1.0.0", 3, 1),
+      run("2026-10-06", "1.0.0", 3, 1),
+      run("2026-10-06", "2.0.0", 4, 4),
+      error("2026-10-05", "1.0.0", "Error", 3),
+      error("2026-10-06", "1.0.0", "Error", 3),
+      error("2026-10-06", "2.0.0", "TypeError", 4),
+    ]);
+    const body = (await (await get(`/v1/stats/generate?${Q}`, token)).json()) as any;
+    expect(body.versions).toEqual([{ version: "1.0.0", runs: 6, failures: 2, failure_rate: 2 / 6 }]);
+    expect(body.errors).toEqual([{ error_type: "Error", runs: 6 }]);
+    expect(body.suppressed_count).toBe(2);
+    expect(body.runs).toBe(10);
+    expect(body.duration_p50).toBe(1000);
+    expect(body.pages_p95).toBe(100);
+  });
+
+  it("hides the quantiles when the total is under 5, and filters by view", async () => {
+    await db.batch([run("2026-10-05", "1.0.0", 4, 0), run("2026-10-05", "1.0.0", 9, 0, "1")]);
+    const local = (await (await get(`/v1/stats/generate?${Q}`, token)).json()) as any;
+    expect(local.runs).toBeNull();
+    expect(local.duration_p50).toBeNull();
+    expect(local.versions).toEqual([]);
+    const ci = (await (await get(`/v1/stats/generate?${Q}&view=ci`, token)).json()) as any;
+    expect(ci.runs).toBe(9);
+  });
+
+  it("rejects bad params", async () => {
+    expect((await get("/v1/stats/generate?view=x", token)).status).toBe(400);
   });
 });
 

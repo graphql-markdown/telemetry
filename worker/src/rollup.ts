@@ -85,6 +85,29 @@ const catalogSql = (day: string): string => {
   );
 };
 
+/** Generate runs per version, trigger and ci, with failures and quantiles. */
+const generateSql = (day: string): string => {
+  return (
+    `SELECT blob5 AS version, blob14 AS trigger, blob12 AS ci, ` +
+    `SUM(_sample_interval * double1) AS runs, ` +
+    `SUMIf(_sample_interval * double1, blob20 != '') AS failures, ` +
+    `quantileWeighted(0.5)(double2, _sample_interval * double1) AS pages_p50, ` +
+    `quantileWeighted(0.95)(double2, _sample_interval * double1) AS pages_p95, ` +
+    `quantileWeighted(0.5)(double3, _sample_interval * double1) AS duration_p50, ` +
+    `quantileWeighted(0.95)(double3, _sample_interval * double1) AS duration_p95 ` +
+    `FROM gqlmd_events WHERE ${dayWindow(day)} AND ${CLEAN} AND blob1 = 'generate' ` +
+    `GROUP BY version, trigger, ci`
+  );
+};
+
+const generateErrorsSql = (day: string): string => {
+  return (
+    `SELECT blob5 AS version, blob20 AS error_type, SUM(_sample_interval * double1) AS runs ` +
+    `FROM gqlmd_events WHERE ${dayWindow(day)} AND ${CLEAN} AND blob1 = 'generate' ` +
+    `AND blob20 != '' GROUP BY version, error_type`
+  );
+};
+
 const rejectsSql = (day: string): string => {
   return (
     `SELECT blob1 AS reason, SUM(_sample_interval * double1) AS n ` +
@@ -251,6 +274,8 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
     shapes.set(id, shape);
   }
   const rejects = await query(env, rejectsSql(day));
+  const generateRows = await query(env, generateSql(day));
+  const generateErrors = await query(env, generateErrorsSql(day));
 
   // Cardinality guard: keep the largest rows.
   const rows: CountRow[] = [...counts].map(([key, n]) => {
@@ -284,6 +309,8 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
     db.prepare("DELETE FROM daily_counts WHERE day = ?").bind(day),
     db.prepare("DELETE FROM rejects_daily WHERE day = ?").bind(day),
     db.prepare("DELETE FROM config_catalog_daily WHERE day = ?").bind(day),
+    db.prepare("DELETE FROM generate_daily WHERE day = ?").bind(day),
+    db.prepare("DELETE FROM generate_errors_daily WHERE day = ?").bind(day),
   ];
   const keptDaily = [...dailyShapes]
     .sort((a, b) => b[1].events - a[1].events)
@@ -312,6 +339,35 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
       db
         .prepare("INSERT INTO rejects_daily (day, reason, n) VALUES (?, ?, ?)")
         .bind(day, String(row.reason), Number(row.n)),
+    );
+  }
+  for (const row of generateRows.slice(0, MAX_ROWS_PER_DAY)) {
+    statements.push(
+      db
+        .prepare(
+          "INSERT INTO generate_daily (day, pkg_version, trigger, ci, runs, failures, pages_p50, pages_p95, duration_p50, duration_p95) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(
+          day,
+          String(row.version),
+          String(row.trigger),
+          String(row.ci),
+          Number(row.runs),
+          Number(row.failures ?? 0),
+          Number(row.pages_p50 ?? 0),
+          Number(row.pages_p95 ?? 0),
+          Number(row.duration_p50 ?? 0),
+          Number(row.duration_p95 ?? 0),
+        ),
+    );
+  }
+  for (const row of generateErrors.slice(0, MAX_ROWS_PER_DAY)) {
+    statements.push(
+      db
+        .prepare(
+          "INSERT INTO generate_errors_daily (day, pkg_version, error_type, runs) VALUES (?, ?, ?, ?)",
+        )
+        .bind(day, String(row.version), String(row.error_type), Number(row.runs)),
     );
   }
   // Additive upsert, applied once per day: the WHERE skips a day that was

@@ -28,7 +28,7 @@ describe("dashboard assets", () => {
     for (const needle of ['id="from"', 'id="to"', 'value="events"', 'value="debounced"', 'value="configs"', 'value="colo_sampled"', 'value="local"', 'value="ci"', 'value="all"']) {
       expect(html).toContain(needle);
     }
-    for (const panel of ["versions", "ci", "provider", "formatter", "graphql", "loader", "create", "targets", "settings", "catalog", "health"]) {
+    for (const panel of ["versions", "ci", "provider", "formatter", "graphql", "loader", "create", "targets", "settings", "catalog", "generate", "health"]) {
       expect(html).toContain(`data-panel="${panel}"`);
     }
   });
