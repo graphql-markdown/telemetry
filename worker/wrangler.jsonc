@@ -1,0 +1,11 @@
+{
+  "name": "gqlmd-telemetry",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "observability": { "enabled": false }
+  // Bindings are declared in later PRs:
+  // "analytics_engine_datasets": [{ "binding": "EVENTS", "dataset": "gqlmd_events" }],
+  // "d1_databases": [{ "binding": "DB", "database_name": "gqlmd-telemetry", "database_id": "..." }],
+  // "ratelimits": [{ "name": "RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } }],
+  // "triggers": { "crons": ["0 3 * * *"] },
+}
