@@ -206,6 +206,26 @@ run "full_workers_subdomain_rejected" {
   expect_failures = [var.workers_subdomain]
 }
 
+run "bare_access_team_domain_rejected" {
+  command = plan
+
+  variables {
+    access_team_domain = "myteam"
+  }
+
+  expect_failures = [var.access_team_domain]
+}
+
+run "empty_access_team_domain_rejected" {
+  command = plan
+
+  variables {
+    access_team_domain = ""
+  }
+
+  expect_failures = [var.access_team_domain]
+}
+
 run "d1_read_replication_disabled" {
   command = plan
 
