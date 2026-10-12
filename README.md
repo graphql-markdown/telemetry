@@ -87,7 +87,7 @@ Follow these steps in order. Every command runs from the repository root unless 
 
 ### 1. Prerequisites
 
-- A Cloudflare account with Zero Trust enabled (Zero Trust > Settings: set the team domain, for example `myteam.cloudflareaccess.com`) and a workers.dev subdomain set (Workers & Pages > Account details). No zone is needed: both Workers are served on workers.dev.
+- A Cloudflare account with Zero Trust enabled (Zero Trust > Settings: set the team domain, for example `myteam.cloudflareaccess.com`) and a workers.dev subdomain set (Workers & Pages > Account details). R2 enabled once in the dashboard (R2 Object Storage > enable, accept the terms and add a payment method; usage here stays in the free tier). Without it the bootstrap fails with `403 … code 10042: Please enable R2 through the Cloudflare Dashboard`. No zone is needed: both Workers are served on workers.dev.
 - [OpenTofu](https://opentofu.org) matching `.opentofu-version` (`1.10.x`).
 - [bun](https://bun.sh). Install the dependencies, including the pinned `wrangler`, with `bun install`.
 

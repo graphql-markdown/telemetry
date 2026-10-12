@@ -4,6 +4,8 @@ Creates the R2 bucket `gqlmd-telemetry-tfstate` that holds the remote state of `
 
 ## One-time steps
 
+R2 must be enabled on the account first (dashboard > R2 Object Storage, with a payment method on file even for the free tier); otherwise `tofu apply` fails with `403 … code 10042`.
+
 1. Create a Cloudflare API token with `Workers R2 Storage: Edit` on the account.
 2. Run:
 
