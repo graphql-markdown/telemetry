@@ -57,6 +57,14 @@ const dimSql = (column: string, day: string, extra = ""): string => {
   );
 };
 
+/** Colo-sampled events (blob17 = '2'), kept at 1/50 and weighted by double1. */
+const coloSql = (column: string, day: string, extra = ""): string => {
+  return (
+    `SELECT ${column} AS value, blob12 AS ci, SUM(_sample_interval * double1) AS colo_sampled ` +
+    `FROM gqlmd_events WHERE ${dayWindow(day)} AND blob17 = '2'${extra} GROUP BY value, ci`
+  );
+};
+
 /** The create target (blob19) only exists on these events; skip the empty value. */
 const TARGET_FILTER = " AND blob1 IN ('create_scaffold', 'create_wire') AND blob19 != ''";
 
@@ -110,6 +118,10 @@ const addMeasures = (counts: Counts, dim: string, value: string, row: Row): void
   for (const measure of MEASURES) {
     add(counts, [String(row.ci), dim, value, measure].join(KEY_SEP), Number(row[measure] ?? 0));
   }
+};
+
+const addColo = (counts: Counts, dim: string, value: string, row: Row): void => {
+  add(counts, [String(row.ci), dim, value, "colo_sampled"].join(KEY_SEP), Number(row.colo_sampled ?? 0));
 };
 
 /** Top-level config keys whose value is an enum or mask token (or a boolean). */
@@ -169,17 +181,26 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
         configEvents += Number(row.raw ?? 0);
       }
     }
+    for (const row of await query(env, coloSql(column, day))) {
+      addColo(counts, dim, String(row.value), row);
+    }
   }
   // Loader kinds: split the comma list. Each fp has one list, so the
   // distinct counts of different lists are disjoint and can be summed.
-  for (const row of await query(env, dimSql("blob7", day))) {
-    const kinds = new Set(
-      String(row.value)
+  const kindsOf = (value: string): Set<string> =>
+    new Set(
+      value
         .split(",")
         .filter((kind) => kind !== ""),
     );
-    for (const kind of kinds) {
+  for (const row of await query(env, dimSql("blob7", day))) {
+    for (const kind of kindsOf(String(row.value))) {
       addMeasures(counts, "loader.kind", kind, row);
+    }
+  }
+  for (const row of await query(env, coloSql("blob7", day))) {
+    for (const kind of kindsOf(String(row.value))) {
+      addColo(counts, "loader.kind", kind, row);
     }
   }
   for (const row of await query(env, dimSql("blob18", day))) {
@@ -187,9 +208,19 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
       addMeasures(counts, `setting.${key}`, value, row);
     }
   }
+  for (const row of await query(env, coloSql("blob18", day))) {
+    for (const [key, value] of settingsOf(String(row.value))) {
+      addColo(counts, `setting.${key}`, value, row);
+    }
+  }
   for (const row of await query(env, dimSql("blob19", day, TARGET_FILTER))) {
     if (String(row.value) !== "") {
       addMeasures(counts, "target", String(row.value), row);
+    }
+  }
+  for (const row of await query(env, coloSql("blob19", day, TARGET_FILTER))) {
+    if (String(row.value) !== "") {
+      addColo(counts, "target", String(row.value), row);
     }
   }
   for (const row of await query(env, quarantinedSql(day))) {

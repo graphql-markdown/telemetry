@@ -11,10 +11,11 @@ const db = (testEnv as unknown as { DB: D1Database }).DB;
 
 type Fixtures = Record<string, Array<Record<string, string | number>>>;
 
-/** Fixture key: the selected blob column, "quarantined", "catalog" or "rejects". */
+/** Fixture key: the selected blob column, "colo:<column>", "quarantined", "catalog" or "rejects". */
 const keyOf = (sql: string): string => {
   if (sql.includes("FROM gqlmd_rejects")) return "rejects";
   if (sql.includes("blob17 = '1'")) return "quarantined";
+  if (sql.includes("blob17 = '2'")) return `colo:${/SELECT (blob\d+) AS value/.exec(sql)?.[1]}`;
   if (sql.includes("AS fp_shape")) return "catalog";
   return /SELECT (blob\d+) AS value/.exec(sql)?.[1] ?? "unknown";
 };
@@ -184,6 +185,40 @@ describe("rollupDay", () => {
     expect(rows.find((r) => r.value === "config" && r.measure === "raw" && r.dim === "event")?.n).toBe(30);
   });
 
+  it("rolls up colo-sampled rows as their own measure, not in raw", async () => {
+    mockAe({
+      blob1: [{ value: "config", raw: 30, debounced_1h: 12, debounced_1d: 8 }],
+      "colo:blob1": [{ value: "config", colo_sampled: 4 }],
+    });
+    await rollupDay(makeEnv(), DAY);
+    const rows = await counts();
+    const get = (measure: string) =>
+      rows.find((r) => r.dim === "event" && r.value === "config" && r.measure === measure)?.n;
+    expect(get("colo_sampled")).toBe(4);
+    expect(get("raw")).toBe(30);
+    const coloSqls = sqls.filter((sql) => sql.includes("blob17 = '2'"));
+    expect(coloSqls.length).toBeGreaterThan(0);
+    for (const sql of coloSqls) {
+      expect(sql).toContain("SUM(_sample_interval * double1) AS colo_sampled");
+      expect(sql).not.toContain("blob17 = '0'");
+    }
+    for (const sql of sqls.filter((q) => q.includes("AS raw"))) {
+      expect(sql).not.toContain("blob17 = '2'");
+    }
+  });
+
+  it("keeps quarantined rows on blob17 = '1' only", async () => {
+    mockAe(base);
+    await rollupDay(makeEnv(), DAY);
+    const quarantinedSqls = sqls.filter((sql) => sql.includes("blob17 = '1'"));
+    expect(quarantinedSqls).toHaveLength(1);
+    expect(quarantinedSqls[0]).not.toContain("colo_sampled");
+    expect(quarantinedSqls[0]).not.toContain("blob17 = '2'");
+    const rows = await counts();
+    expect(rows.find((r) => r.value === "config" && r.measure === "quarantined")?.n).toBe(500);
+    expect(rows.some((r) => r.measure === "colo_sampled")).toBe(false);
+  });
+
   it("records rejects and the config catalog", async () => {
     mockAe(base);
     await rollupDay(makeEnv(), DAY);
@@ -276,7 +311,7 @@ describe("rollupDay", () => {
     await rollupDay(makeEnv(), DAY);
     expect(sqls.length).toBeGreaterThan(0);
     for (const sql of sqls) {
-      expect(sql).not.toMatch(/user.?agent|\bip\b|header|x-forwarded|cf-connecting|colo/i);
+      expect(sql).not.toMatch(/user.?agent|\bip\b|header|x-forwarded|cf-connecting|\bcolo\b/i);
     }
   });
 
