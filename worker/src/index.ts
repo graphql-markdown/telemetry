@@ -167,7 +167,7 @@ const ingest = async (request: Request, env: Env): Promise<Response> => {
   }
   env.EVENTS.writeDataPoint({
     indexes: [fp],
-    blobs: buildBlobs(result.value, fp, fpShape, abuse.quarantined || coloWeight > 1),
+    blobs: buildBlobs(result.value, fp, fpShape, abuse.quarantined),
     // Weight: 1 normally, N when kept under 1/N sampling. Queries must use
     // SUM(_sample_interval * double1), never count().
     doubles: [abuse.weight * coloWeight],

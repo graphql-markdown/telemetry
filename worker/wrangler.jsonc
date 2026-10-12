@@ -17,7 +17,7 @@
   ],
 
   // Rate limits keyed by `${fp}:${colo}`. RL (100 per 60 s) trips a quarantine;
-  // RL_HARD (1000 per 60 s) is the quota-protection ceiling: over it, drop.
+  // RL_HARD (1000 per 60 s) is the quota-protection ceiling: over it, sampled 1/20 and flagged.
   "ratelimits": [
     {
       "name": "RL",

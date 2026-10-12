@@ -8,7 +8,7 @@ export interface Env {
   RL?: RateLimit;
   /** Per-colo limit, independent of the payload: 2000 per 60 s, checked before parsing. */
   RL_COLO?: RateLimit;
-  /** Hard-drop ceiling per `(fp, colo)`: 1000 per 60 s. */
+  /** Hard ceiling per `(fp, colo)`: 1000 per 60 s; above it events are sampled 1/20 and flagged. */
   RL_HARD?: RateLimit;
   /** Comma-separated retired payload versions (answered with 410). Empty by default. */
   RETIRED_VERSIONS?: string;

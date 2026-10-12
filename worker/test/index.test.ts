@@ -339,7 +339,8 @@ describe("per-colo limit", () => {
     expect(RL_COLO.limit).toHaveBeenCalledWith({ key: "colo:LHR" });
     for (const [point] of events.writeDataPoint.mock.calls) {
       expect(point.doubles).toEqual([50]);
-      expect(point.blobs[16]).toBe("1");
+      // Colo sampling is not abuse: events stay in raw counts.
+      expect(point.blobs[16]).toBe("0");
     }
     expect(rejects.writeDataPoint).toHaveBeenCalledTimes(total - kept);
     expect(rejects.writeDataPoint.mock.calls[0][0].blobs).toEqual(["sampled-out"]);
