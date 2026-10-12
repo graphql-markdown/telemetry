@@ -215,6 +215,7 @@ const VALUE_STRINGS = new Set<string>([
   ...FORMATTER_PRESETS,
   ...KNOWN_LOADERS,
   ...MASK_TOKENS,
+  "natural",
 ]);
 
 /**
@@ -275,6 +276,7 @@ const NO_NAMES: ReadonlySet<string> = new Set();
 /** Loader entries are `{ [loaderName]: { module, options } }`. */
 const LOADER_NAMES: ReadonlySet<string> = new Set([
   ...KNOWN_LOADERS,
+  "<custom-loader>",
   "module",
   "options",
 ]);
@@ -354,16 +356,14 @@ const sanitizeSection = (
       : FAIL;
   }
   if (typeof value === "string") {
-    return VALUE_STRINGS.has(value) || PACKAGE_NAMES.has(value)
-      ? value
-      : FAIL;
+    if (VALUE_STRINGS.has(value) || PACKAGE_NAMES.has(value)) {
+      return value;
+    }
+    return value.startsWith("@graphql-markdown/") ? UNKNOWN_VALUE : FAIL;
   }
   if (Array.isArray(value)) {
-    if (value.length > MAX_ITEMS) {
-      return FAIL;
-    }
     const out: unknown[] = [];
-    for (const item of value) {
+    for (const item of value.slice(0, MAX_ITEMS)) {
       const checked = sanitizeSection(item, depth + 1, names);
       if (checked === FAIL) {
         return FAIL;
@@ -373,11 +373,8 @@ const sanitizeSection = (
     return out;
   }
   if (isObject(value)) {
-    if (Object.keys(value).length > MAX_ITEMS) {
-      return FAIL;
-    }
     const out: Json = {};
-    for (const [key, item] of Object.entries(value)) {
+    for (const [key, item] of Object.entries(value).slice(0, MAX_ITEMS)) {
       if (!KEY_TOKEN.test(key) && !names.has(key)) {
         return FAIL;
       }

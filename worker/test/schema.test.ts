@@ -245,7 +245,6 @@ describe("validate: closed sets for free-text channels", () => {
   });
 
   it("rejects unknown package names in config values", () => {
-    expect(validate(withConfig({ formatter: "@graphql-markdown/acme-secret" })).ok).toBe(false);
     expect(validate(withConfig({ formatter: "@graphql-markdown/formatters/hugo" })).ok).toBe(true);
   });
 
@@ -259,10 +258,41 @@ describe("validate: closed sets for free-text channels", () => {
   it("limits key tokens, array length and object size", () => {
     expect(validate(withConfig({ metatags: [{ "<key:999>": "<string>" }] })).ok).toBe(false);
     expect(validate(withConfig({ metatags: [{ "<key:99>": "<string>" }] })).ok).toBe(true);
-    expect(validate(withConfig({ skipDocDirective: Array(51).fill("<string>") })).ok).toBe(false);
     expect(validate(withConfig({ skipDocDirective: Array(50).fill("<string>") })).ok).toBe(true);
     const wide = Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`<key:${i}>`, "<string>"]));
-    expect(validate(withConfig({ metatags: [wide] })).ok).toBe(false);
+    expect(validate(withConfig({ metatags: [wide] })).ok).toBe(true);
+  });
+
+  it("truncates arrays and objects over 50 entries", () => {
+    const long = validate(withConfig({ skipDocDirective: Array(60).fill("<string>") }));
+    expect(long).toMatchObject({ ok: true });
+    expect((long as any).value.config.skipDocDirective).toHaveLength(50);
+    const wide = Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`<key:${i}>`, "<string>"]));
+    const res = validate(withConfig({ metatags: wide })) as any;
+    expect(Object.keys(res.value.config.metatags)).toHaveLength(50);
+    expect(res.value.config.metatags["<key:49>"]).toBe("<string>");
+    expect(res.value.config.metatags["<key:50>"]).toBeUndefined();
+  });
+
+  it("accepts <custom-loader> as a loaders key and natural as a value", () => {
+    const res = validate(
+      withConfig({
+        loaders: { "<custom-loader>": { module: "<custom-loader>" } },
+        docOptions: { categorySort: "natural" },
+      }),
+    );
+    expect(res).toMatchObject({ ok: true });
+  });
+
+  it("maps unlisted @graphql-markdown strings to unknown-value", () => {
+    expect(validate(withConfig({ formatter: "@graphql-markdown/acme-secret" }))).toMatchObject({
+      ok: true,
+      value: { config: { formatter: "unknown-value" } },
+    });
+    expect(validate(withConfig({ id: "@graphql-markdown/x/y" }))).toMatchObject({
+      value: { config: { id: "unknown-value" } },
+    });
+    expect(validate(withConfig({ id: "secret" })).ok).toBe(false);
   });
 
   it("maps out-of-range node and graphql majors to unknown-value", () => {
