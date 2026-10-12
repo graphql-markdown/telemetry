@@ -87,7 +87,7 @@ Follow these steps in order. Every command runs from the repository root unless 
 
 ### 1. Prerequisites
 
-- A Cloudflare account with Zero Trust enabled (Zero Trust > Settings: set the team domain, for example `myteam.cloudflareaccess.com`) and a workers.dev subdomain set (Workers & Pages > Account details). R2 enabled once in the dashboard (R2 Object Storage > enable, accept the terms and add a payment method; usage here stays in the free tier). Without it the bootstrap fails with `403 … code 10042: Please enable R2 through the Cloudflare Dashboard`. No zone is needed: both Workers are served on workers.dev.
+- A Cloudflare account with Zero Trust enabled (Zero Trust > Settings: set the team domain, for example `myteam.cloudflareaccess.com`) and a workers.dev subdomain set (Workers & Pages > Account details). R2 enabled once in the dashboard (R2 Object Storage > enable, accept the terms and add a payment method; usage here stays in the free tier). Without it the bootstrap fails with `403 … code 10042: Please enable R2 through the Cloudflare Dashboard`. Enable Analytics Engine once as well (Workers & Pages > Analytics Engine; free), otherwise the Worker upload fails with `403 … code 10089`. No zone is needed: both Workers are served on workers.dev.
 - [OpenTofu](https://opentofu.org) matching `.opentofu-version` (`1.10.x`).
 - [bun](https://bun.sh). Install the dependencies, including the pinned `wrangler`, with `bun install`.
 
@@ -102,6 +102,7 @@ Create a token at Cloudflare dashboard > My Profile > API Tokens, with these per
 | Account | Workers KV Storage: Edit |
 | Account | Workers R2 Storage: Edit |
 | Account | Access: Apps and Policies: Edit |
+| Account | Access: Organizations, Identity Providers, and Groups: Edit (the One-time PIN login; without it: 403 `auth.forbidden`, code 1010) |
 | Account | Account Analytics: Read |
 
 There are no Zone permissions. Note the **account ID** (dashboard home > account menu > Copy account ID) and the **workers.dev subdomain** (the `<sub>` in `<script>.<sub>.workers.dev`).
