@@ -12,8 +12,7 @@ export const EVENTS = ["config", "create_scaffold", "create_wire"] as const;
 export const TRIGGERS = [
   "cli",
   "create",
-  "docusaurus-build",
-  "docusaurus-dev",
+  "docusaurus",
   "nuxt",
   "programmatic",
 ] as const;
