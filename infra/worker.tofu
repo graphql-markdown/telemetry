@@ -10,30 +10,6 @@ resource "cloudflare_d1_database" "telemetry" {
   name       = local.worker_name
 }
 
-# Read-only token the cron uses for the Analytics Engine SQL API.
-data "cloudflare_api_token_permission_groups_list" "analytics_read" {
-  name      = "Account Analytics Read" # verify: exact permission group name in the v5 data source
-  scope     = "com.cloudflare.api.account"
-  max_items = 1
-}
-
-resource "cloudflare_api_token" "ae_sql" {
-  name = "${local.worker_name}-ae-sql"
-
-  policies = [
-    {
-      effect = "allow"
-      permission_groups = [
-        { id = data.cloudflare_api_token_permission_groups_list.analytics_read.result[0].id },
-      ]
-      # v5 takes resources as a JSON-encoded string.
-      resources = jsonencode({
-        "com.cloudflare.api.account.${var.account_id}" = "*"
-      })
-    },
-  ]
-}
-
 resource "cloudflare_workers_script" "telemetry" {
   account_id  = var.account_id
   script_name = local.worker_name
@@ -100,7 +76,7 @@ resource "cloudflare_workers_script" "telemetry" {
     {
       name = "AE_SQL_TOKEN"
       type = "secret_text"
-      text = cloudflare_api_token.ae_sql.value
+      text = var.ae_sql_token
     },
     {
       name = "ACCOUNT_ID"

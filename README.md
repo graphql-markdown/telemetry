@@ -98,11 +98,12 @@ Create a token at Cloudflare dashboard > My Profile > API Tokens, with these per
 | Account | Workers R2 Storage: Edit |
 | Account | Access: Apps and Policies: Edit |
 | Account | Account Analytics: Read |
-| Account | API Tokens: Edit (tofu creates the read-only Analytics token used by the cron) |
 | Zone (graphql-markdown.dev) | Workers Routes: Edit |
 | Zone (graphql-markdown.dev) | DNS: Edit (custom domains create the DNS record) |
 
 Note the **account ID** (dashboard home > account menu > Copy account ID) and the **zone ID** (zone Overview page, right column).
+
+The cron needs a second, read-only token for the Analytics Engine SQL API. Create it the same way with a single permission, **Account | Account Analytics: Read**, restricted to this account. Keep it for step 4 (`AE_SQL_TOKEN`).
 
 ### 3. One-time bootstrap
 
@@ -129,12 +130,13 @@ Add these under Settings > Secrets and variables > Actions. The names match the 
 | `AWS_ACCESS_KEY_ID` | secret | R2 S3 access key for the state backend |
 | `AWS_SECRET_ACCESS_KEY` | secret | R2 S3 secret for the state backend |
 | `TOFU_STATE_PASSPHRASE` | secret | `state_passphrase`; keep a copy in a password manager, losing it makes the state unreadable |
+| `AE_SQL_TOKEN` | secret | `ae_sql_token`, the read-only Analytics token from step 2 |
 | `ALERT_WEBHOOK` | secret, optional | `alert_webhook` (no-events alert) |
 | `ZONE_ID` | variable | `zone_id` |
 | `ACCESS_TEAM_DOMAIN` | variable | `access_team_domain` |
 | `DASHBOARD_EMAILS` | variable | `dashboard_emails`, a JSON list such as `["you@example.com"]` |
 
-The workflow does not apply infrastructure yet, so these are only read by a future apply job. For manual runs, export the same values as `TF_VAR_account_id`, `TF_VAR_zone_id`, `TF_VAR_cloudflare_api_token`, `TF_VAR_state_passphrase`, `TF_VAR_access_team_domain` and `TF_VAR_dashboard_emails` (and optionally `TF_VAR_alert_webhook`, `TF_VAR_public_stats`).
+The workflow does not apply infrastructure yet, so these are only read by a future apply job. For manual runs, export the same values as `TF_VAR_account_id`, `TF_VAR_zone_id`, `TF_VAR_cloudflare_api_token`, `TF_VAR_state_passphrase`, `TF_VAR_ae_sql_token`, `TF_VAR_access_team_domain` and `TF_VAR_dashboard_emails` (and optionally `TF_VAR_alert_webhook`, `TF_VAR_public_stats`).
 
 ### 5. Initialise and apply the infrastructure
 
@@ -192,11 +194,11 @@ For the infrastructure, run `tofu fmt -check -recursive` and `tofu init -backend
 
 ### 10. Token rotation and teardown
 
-- **Rotate the API token:** create the new token with the scopes above, update `CLOUDFLARE_API_TOKEN` (GitHub and your shell), then revoke the old one. The Analytics read token used by the cron is managed by tofu: `tofu apply -replace=cloudflare_api_token.ae_sql` rotates it.
+- **Rotate the API token:** create the new token with the scopes above, update `CLOUDFLARE_API_TOKEN` (GitHub and your shell), then revoke the old one. **Rotate the Analytics read token** (`AE_SQL_TOKEN`): create the new token, update the secret (and `TF_VAR_ae_sql_token` in your shell), run `tofu apply`, then revoke the old one.
 - **Rotate the R2 S3 credentials:** create new ones, update `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, then delete the old ones.
 - **Do not rotate `TOFU_STATE_PASSPHRASE`** without migrating the state first; it encrypts the state and plans.
 - **Teardown:** `tofu destroy` in `infra/`, then in `infra/bootstrap` (this removes the state bucket; empty it first). Deleting the D1 database deletes the rollup history.
 
 ### Required Worker secrets
 
-`AE_SQL_TOKEN` (Account Analytics Read) and `ACCOUNT_ID` for the daily rollup, and optionally `ALERT_WEBHOOK`, are all set by `infra/worker.tofu`.
+`AE_SQL_TOKEN` (Account Analytics Read, passed in as `ae_sql_token`) and `ACCOUNT_ID` for the daily rollup, and optionally `ALERT_WEBHOOK`, are all set by `infra/worker.tofu`.

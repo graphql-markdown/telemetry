@@ -1,27 +1,13 @@
 # Plan-only tests: mocked providers, no credentials. Run with `tofu test`.
 
-mock_provider "cloudflare" {
-  # The mocked list data source returns no items by default; give the token
-  # policy a permission group to reference.
-  override_data {
-    target = data.cloudflare_api_token_permission_groups_list.analytics_read
-    values = {
-      result = [{
-        id            = "00000000000000000000000000000001"
-        name          = "Account Analytics Read"
-        category      = "Analytics"
-        is_selectable = true
-        scopes        = ["com.cloudflare.api.account"]
-      }]
-    }
-  }
-}
+mock_provider "cloudflare" {}
 
 variables {
   account_id           = "00000000000000000000000000000000"
   zone_id              = "11111111111111111111111111111111"
   domain               = "telemetry.example.test"
   cloudflare_api_token = "dummy"
+  ae_sql_token         = "dummy-read-token"
   state_passphrase     = "dummy-passphrase-0123456789"
   dashboard_emails     = ["me@example.test"]
   access_team_domain   = "team.cloudflareaccess.com"
@@ -100,25 +86,28 @@ run "cron" {
   }
 }
 
-run "ae_sql_token_read_only" {
+run "ae_sql_token_from_variable" {
   command = plan
 
   assert {
-    condition     = data.cloudflare_api_token_permission_groups_list.analytics_read.name == "Account Analytics Read"
-    error_message = "token must use the analytics read permission group"
+    condition     = [for b in cloudflare_workers_script.telemetry.bindings : b.type if b.name == "AE_SQL_TOKEN"][0] == "secret_text"
+    error_message = "AE_SQL_TOKEN must be secret_text"
   }
 
   assert {
-    condition = alltrue([
-      for p in cloudflare_api_token.ae_sql.policies : length(p.permission_groups) == 1
-    ])
-    error_message = "token policy must carry only the analytics read group" # verify: v5 policies shape
+    condition     = [for b in cloudflare_workers_script.telemetry.bindings : b.text if b.name == "AE_SQL_TOKEN"][0] == var.ae_sql_token
+    error_message = "AE_SQL_TOKEN must come from var.ae_sql_token"
+  }
+}
+
+run "empty_ae_sql_token_rejected" {
+  command = plan
+
+  variables {
+    ae_sql_token = ""
   }
 
-  assert {
-    condition     = !can(regex("(?i)write|edit", data.cloudflare_api_token_permission_groups_list.analytics_read.name))
-    error_message = "token must have no write or edit scope"
-  }
+  expect_failures = [var.ae_sql_token]
 }
 
 run "access_application" {
