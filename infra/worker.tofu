@@ -14,6 +14,11 @@ locals {
 resource "cloudflare_d1_database" "telemetry" {
   account_id = var.account_id
   name       = local.worker_name
+
+  # Provider v5 sends null otherwise and the API rejects it.
+  read_replication = {
+    mode = "disabled"
+  }
 }
 
 # Quarantine flags (the Cache API does not work on workers.dev).

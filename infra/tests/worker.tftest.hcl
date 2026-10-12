@@ -192,3 +192,12 @@ run "empty_workers_subdomain_rejected" {
 
   expect_failures = [var.workers_subdomain]
 }
+
+run "d1_read_replication_disabled" {
+  command = plan
+
+  assert {
+    condition     = cloudflare_d1_database.telemetry.read_replication.mode == "disabled"
+    error_message = "D1 read replication must be set explicitly to disabled"
+  }
+}
