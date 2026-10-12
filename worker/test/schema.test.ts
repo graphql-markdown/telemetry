@@ -166,7 +166,6 @@ describe("validate: leaking payloads", () => {
     ["leaky key path", { "/etc/passwd": "<path>" }],
     ["leaky key url", { "https://x.test": "<url>" }],
     ["leaky key dotted", { "api.acme.internal": "<url>" }],
-    ["null value", { schema: null }],
   ])("rejects %s in config", (_name, config) => {
     expect(validate(withConfig(config))).toEqual({
       ok: false,
@@ -261,6 +260,13 @@ describe("validate: closed sets for free-text channels", () => {
     expect(validate(withConfig({ skipDocDirective: Array(50).fill("<string>") })).ok).toBe(true);
     const wide = Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`<key:${i}>`, "<string>"]));
     expect(validate(withConfig({ metatags: [wide] })).ok).toBe(true);
+  });
+
+  it("accepts null option values", () => {
+    expect(validate(withConfig({ id: null, force: null }))).toMatchObject({
+      ok: true,
+      value: { config: { id: null, force: null } },
+    });
   });
 
   it("truncates arrays and objects over 50 entries", () => {

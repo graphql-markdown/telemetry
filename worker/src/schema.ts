@@ -347,7 +347,7 @@ const sanitizeSection = (
   if (depth > MAX_DEPTH) {
     return FAIL;
   }
-  if (typeof value === "boolean") {
+  if (value === null || typeof value === "boolean") {
     return value;
   }
   if (typeof value === "number") {
