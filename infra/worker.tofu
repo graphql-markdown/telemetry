@@ -1,4 +1,4 @@
-# The telemetry Worker. Build first (`bun run build`) so ../dist/index.js exists.
+# The telemetry Worker. Build first (`bun run build`) so ../worker/dist/index.js exists.
 
 locals {
   worker_name = "gqlmd-telemetry"
@@ -10,7 +10,7 @@ resource "cloudflare_workers_script" "telemetry" {
 
   # Module worker bundled by `wrangler deploy --dry-run --outdir dist`.
   main_module        = "index.js"
-  content            = file("${path.module}/../dist/index.js") # verify: v5 may prefer content_file + content_sha256
+  content            = file("${path.module}/../worker/dist/index.js") # verify: v5 may prefer content_file + content_sha256
   compatibility_date = "2026-08-01"
 
   # Observability (logs and traces) stays off: no request data is logged.
