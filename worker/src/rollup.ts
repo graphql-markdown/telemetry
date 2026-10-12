@@ -50,12 +50,15 @@ const MEASURE_COLUMNS =
   "count(DISTINCT (blob2, toStartOfHour(timestamp))) AS debounced_1h, " +
   "count(DISTINCT blob2) AS debounced_1d";
 
-const dimSql = (column: string, day: string): string => {
+const dimSql = (column: string, day: string, extra = ""): string => {
   return (
     `SELECT ${column} AS value, blob12 AS ci, ${MEASURE_COLUMNS} FROM gqlmd_events ` +
-    `WHERE ${dayWindow(day)} AND ${CLEAN} GROUP BY value, ci`
+    `WHERE ${dayWindow(day)} AND ${CLEAN}${extra} GROUP BY value, ci`
   );
 };
+
+/** The create target (blob19) only exists on these events; skip the empty value. */
+const TARGET_FILTER = " AND blob1 IN ('create_scaffold', 'create_wire') AND blob19 != ''";
 
 const quarantinedSql = (day: string): string => {
   return (
@@ -182,6 +185,11 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
   for (const row of await query(env, dimSql("blob18", day))) {
     for (const [key, value] of settingsOf(String(row.value))) {
       addMeasures(counts, `setting.${key}`, value, row);
+    }
+  }
+  for (const row of await query(env, dimSql("blob19", day, TARGET_FILTER))) {
+    if (String(row.value) !== "") {
+      addMeasures(counts, "target", String(row.value), row);
     }
   }
   for (const row of await query(env, quarantinedSql(day))) {

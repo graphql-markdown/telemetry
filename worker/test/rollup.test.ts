@@ -130,6 +130,23 @@ describe("rollupDay", () => {
     expect(get("setting.baseURL", "/x", "raw")).toBeUndefined();
   });
 
+  it("rolls up the create target for create events only", async () => {
+    mockAe({
+      blob19: [
+        { value: "docusaurus", raw: 9, debounced_1h: 4, debounced_1d: 3 },
+        { value: "", raw: 99, debounced_1h: 9, debounced_1d: 9 },
+      ],
+    });
+    await rollupDay(makeEnv(), DAY);
+    const targets = (await counts()).filter((r) => r.dim === "target");
+    expect(targets.map((r) => r.value)).toEqual(["docusaurus", "docusaurus", "docusaurus"]);
+    expect(targets.find((r) => r.measure === "raw")?.n).toBe(9);
+    const sql = sqls.find((q) => q.includes("blob19 AS value")) ?? "";
+    expect(sql).toContain("blob1 IN ('create_scaffold', 'create_wire')");
+    expect(sql).toContain("blob19 != ''");
+    expect(sql).toContain("blob17 = '0'");
+  });
+
   it("keeps CI and local rows for the same config apart", async () => {
     mockAe({
       blob1: [
