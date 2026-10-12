@@ -42,18 +42,16 @@ export const formatterOf = (payload: Json): string => {
 };
 
 /**
- * Server-side fingerprints over the project-describing fields only: masked
- * config, loader kinds, formatter, pkgVersion and graphqlMajor. Per-machine
+ * Server-side fingerprints. `fpShape` hashes only the masked config, loader
+ * and formatter, so catalog identity is stable across versions, events and
+ * targets. `fp` adds pkgVersion, graphqlMajor, event and target. Per-machine
  * fields (os, nodeMajor, pm, ci, ciProvider, container, wsl, firstRun,
- * trigger) are excluded. `event` and `target` are included so create
- * events do not share a bucket with config events or each other. `fpShape` also drops pkgVersion and graphqlMajor.
+ * trigger) are excluded from both.
  */
 export const fingerprints = async (
   payload: Json,
 ): Promise<{ fp: string; fpShape: string }> => {
   const shape = {
-    event: payload.event,
-    target: payload.target ?? null,
     config: payload.config ?? null,
     loader: payload.loader ?? null,
     formatter: formatterOf(payload),
@@ -62,6 +60,8 @@ export const fingerprints = async (
     ...shape,
     pkgVersion: payload.pkgVersion,
     graphqlMajor: payload.graphqlMajor,
+    event: payload.event,
+    target: payload.target ?? null,
   };
   return {
     fp: await sha256Hex(canonicalJson(full)),

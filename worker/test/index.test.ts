@@ -231,15 +231,23 @@ describe("fingerprints", () => {
     expect(b.fpShape).toBe(a.fpShape);
   });
 
-  it("changes both on a different event or target", async () => {
-    const a = await fpOf({});
-    const b = await fpOf({ event: "create_scaffold", target: "hugo" });
-    const c = await fpOf({ event: "create_wire", target: "hugo" });
-    const d = await fpOf({ event: "create_wire", target: "mkdocs" });
-    for (const [x, y] of [[a, b], [b, c], [c, d]]) {
-      expect(x.fp).not.toBe(y.fp);
-      expect(x.fpShape).not.toBe(y.fpShape);
-    }
+  it("keeps fpShape stable across pkgVersion for config events", async () => {
+    const config = { schema: "<path>" };
+    const a = await fpOf({ config });
+    const b = await fpOf({ config, pkgVersion: "2.0.0" });
+    expect(b.fp).not.toBe(a.fp);
+    expect(b.fpShape).toBe(a.fpShape);
+  });
+
+  it("changes fp but not fpShape on a different event or target", async () => {
+    const config = { schema: "<path>" };
+    const scaffold = await fpOf({ event: "create_scaffold", target: "hugo", config });
+    const wire = await fpOf({ event: "create_wire", target: "hugo", config });
+    const other = await fpOf({ event: "create_wire", target: "mkdocs", config });
+    expect(scaffold.fp).not.toBe(wire.fp);
+    expect(wire.fp).not.toBe(other.fp);
+    expect(scaffold.fpShape).toBe(wire.fpShape);
+    expect(wire.fpShape).toBe(other.fpShape);
   });
 
   it("stores the create target as the last blob", async () => {
