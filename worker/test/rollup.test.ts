@@ -352,6 +352,15 @@ describe("alert", () => {
     expect(body.text).toBe(body.content);
   });
 
+  it("stays silent when only colo-sampled config events arrived", async () => {
+    mockAe({
+      blob1: [{ value: "create", raw: 2, debounced_1h: 1, debounced_1d: 1 }],
+      "colo:blob1": [{ value: "config", colo_sampled: 4 }],
+    });
+    await run("https://hooks.test/x");
+    expect(hookCalls()).toHaveLength(0);
+  });
+
   it("stays silent when config events arrived", async () => {
     mockAe(base);
     await run("https://hooks.test/x");

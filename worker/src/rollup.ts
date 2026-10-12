@@ -183,6 +183,9 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
     }
     for (const row of await query(env, coloSql(column, day))) {
       addColo(counts, dim, String(row.value), row);
+      if (dim === "event" && String(row.value) === "config") {
+        configEvents += Number(row.colo_sampled ?? 0);
+      }
     }
   }
   // Loader kinds: split the comma list. Each fp has one list, so the
