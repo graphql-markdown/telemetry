@@ -119,10 +119,19 @@ resource "cloudflare_workers_script" "telemetry" {
       type = "plain_text"
       text = var.public_stats
     },
+    {
+      # Uploaded by `wrangler deploy` (public/); kept by keep_assets below.
+      name = "ASSETS"
+      type = "assets"
+    },
   ] # verify: binding attribute names (namespace_id, simple) against the v5 schema
 
   # wrangler deploy owns the bundle and the public/ assets after the first deploy;
   # tofu keeps the bindings and vars but must not overwrite the uploaded script.
+  # Without keep_assets and the ASSETS binding, each apply would drop the assets
+  # until the next `wrangler deploy`.
+  keep_assets = true
+
   lifecycle {
     ignore_changes = [content]
   }
@@ -175,9 +184,18 @@ resource "cloudflare_workers_script" "dashboard" {
       type = "plain_text"
       text = var.access_aud
     },
+    {
+      # Uploaded by `wrangler deploy` (dashboard/); kept by keep_assets below.
+      name = "ASSETS"
+      type = "assets"
+    },
   ] # verify: binding attribute names against the v5 schema
 
   # wrangler deploy owns the bundle and the static assets after the first deploy.
+  # Without keep_assets and the ASSETS binding, each apply would drop the assets
+  # until the next `wrangler deploy`.
+  keep_assets = true
+
   lifecycle {
     ignore_changes = [content]
   }
