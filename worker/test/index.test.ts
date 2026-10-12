@@ -54,7 +54,57 @@ describe("POST /v1/event", () => {
       "0",
       JSON.stringify(payload().config),
       "",
+      "",
     ]);
+  });
+
+  describe("generate events", () => {
+    const generate = (extra: Record<string, unknown> = {}) => {
+      const { config: _config, cli: _cli, loader: _loader, ...rest } = payload() as Record<string, unknown>;
+      return { ...rest, event: "generate", pages: 12, durationMs: 3400, ...extra };
+    };
+
+    it("writes errorType to blob20 and pages and duration to doubles", async () => {
+      const { env, events } = mockEnv();
+      const res = await worker.fetch(
+        post(JSON.stringify(generate({ errorType: "post:TypeError:ENOENT" })), JSON_HEADERS),
+        env,
+      );
+      expect(res.status).toBe(202);
+      const point = events.writeDataPoint.mock.calls[0][0];
+      expect(point.doubles).toEqual([1, 12, 3400]);
+      expect(point.blobs).toHaveLength(20);
+      expect(point.blobs[0]).toBe("generate");
+      expect(point.blobs[17]).toBe("{}");
+      expect(point.blobs[19]).toBe("post:TypeError:ENOENT");
+    });
+
+    it("stores an empty errorType on success", async () => {
+      const { env, events } = mockEnv();
+      await worker.fetch(post(JSON.stringify(generate()), JSON_HEADERS), env);
+      const point = events.writeDataPoint.mock.calls[0][0];
+      expect(point.blobs[19]).toBe("");
+      expect(point.doubles).toEqual([1, 12, 3400]);
+    });
+
+    it.each([
+      ["unknown errorType", generate({ errorType: "Boom" })],
+      ["missing pages", generate({ pages: undefined })],
+      ["config on generate", generate({ config: {} })],
+      ["cli on generate", generate({ cli: { force: true } })],
+      ["loader on generate", generate({ loader: "url" })],
+      ["pages out of range", generate({ pages: 1_000_001 })],
+      ["non-integer pages", generate({ pages: 1.5 })],
+      ["durationMs not a multiple of 100", generate({ durationMs: 3410 })],
+      ["durationMs out of range", generate({ durationMs: 86_400_100 })],
+      ["generate field on a config event", payload({ durationMs: 100 })],
+    ])("rejects %s with schema", async (_name, body) => {
+      const { env, events, rejects } = mockEnv();
+      const res = await worker.fetch(post(JSON.stringify(body), JSON_HEADERS), env);
+      expect(res.status).toBe(204);
+      expect(events.writeDataPoint).not.toHaveBeenCalled();
+      expect(rejects.writeDataPoint.mock.calls[0][0].blobs).toEqual(["schema"]);
+    });
   });
 
   it("accepts a gzip body", async () => {
@@ -250,14 +300,14 @@ describe("fingerprints", () => {
     expect(wire.fpShape).toBe(other.fpShape);
   });
 
-  it("stores the create target as the last blob", async () => {
+  it("stores the create target as blob19", async () => {
     const { env, events } = mockEnv();
     await worker.fetch(
       post(JSON.stringify(payload({ event: "create_scaffold", target: "hugo" })), JSON_HEADERS),
       env,
     );
     const blobs: string[] = events.writeDataPoint.mock.calls[0][0].blobs;
-    expect(blobs).toHaveLength(19);
+    expect(blobs).toHaveLength(20);
     expect(blobs[18]).toBe("hugo");
   });
 

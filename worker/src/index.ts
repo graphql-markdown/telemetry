@@ -27,7 +27,8 @@ const MAX_CONFIG_JSON = 3000;
  * Blob order of a `gqlmd_events` data point (index 0 first):
  * event, fp, fpShape, pkg, pkgVersion, formatter, loader kinds (comma-joined),
  * os, pm, nodeMajor, graphqlMajor, ci, ciProvider, trigger, container, wsl,
- * abuse state, sanitized config JSON, target (create preset, else ""; blob19).
+ * abuse state, sanitized config JSON, target (create preset, else ""; blob19),
+ * errorType (generate failures, else ""; blob20, the last free blob).
  * Booleans are "1" or "0". The abuse state (blob17) is "0" clean, "1"
  * quarantined (per-(fp, colo) quarantine or RL_HARD flood) or "2" colo-sampled
  * (RL_COLO tripped, kept at 1/SAMPLE_COLO with that weight).
@@ -60,7 +61,18 @@ export const buildBlobs = (
     abuseState,
     configJson.length > MAX_CONFIG_JSON ? '{"truncated":true}' : configJson,
     String(payload.target ?? ""),
+    String(payload.errorType ?? ""),
   ];
+};
+
+/**
+ * Double order: weight (double1), then for generate events only pages
+ * (double2) and durationMs (double3).
+ */
+export const buildDoubles = (payload: Json, weight: number): number[] => {
+  return payload.event === "generate"
+    ? [weight, Number(payload.pages), Number(payload.durationMs)]
+    : [weight];
 };
 
 const isRetired = (env: Env, version: unknown): boolean => {
@@ -188,7 +200,7 @@ const ingest = async (request: Request, env: Env): Promise<Response> => {
     ),
     // Weight: 1 normally, N when kept under 1/N sampling. Queries must use
     // SUM(_sample_interval * double1), never count().
-    doubles: [abuse.weight * coloWeight],
+    doubles: buildDoubles(result.value, abuse.weight * coloWeight),
   });
   return new Response(null, { status: 202 });
 };

@@ -111,6 +111,62 @@ describe("validate: normalization", () => {
   });
 });
 
+describe("validate: generate events", () => {
+  const generate = (extra: Record<string, unknown> = {}) => ({
+    ...base(),
+    event: "generate",
+    durationMs: 1200,
+    pages: 3,
+    ...extra,
+  });
+
+  it.each([
+    "Error",
+    "GraphQLError:ENOENT",
+    "post:SystemError:EACCES",
+    "<custom-error>",
+    "post:<custom-error>",
+    "<no-schema>",
+    "post:<no-schema>",
+  ])("accepts errorType %s", (errorType) => {
+    const payload = generate({ errorType, pages: 0 });
+    expect(validate(payload)).toEqual({ ok: true, value: payload });
+  });
+
+  it.each(["", "error", "Boom", "Error:enoent", "Error:E", "Error:ENOENTENOENTENOENTENOENT", "post:post:Error", "<no-schema>:ENOENT", "Error\n"])(
+    "rejects errorType %j",
+    (errorType) => {
+      expect(validate(generate({ errorType })).ok).toBe(false);
+    },
+  );
+
+  it.each([
+    { pages: undefined },
+    { pages: -1 },
+    { config: {} },
+    { cli: {} },
+    { loader: "url" },
+    { pages: 1_000_001 },
+    { pages: 2.5 },
+    { pages: "3" },
+    { durationMs: 150 },
+    { durationMs: -100 },
+    { durationMs: 86_400_100 },
+    { durationMs: undefined },
+  ])("rejects %j", (extra) => {
+    expect(validate(generate(extra)).ok).toBe(false);
+  });
+
+  it("accepts the upper bounds", () => {
+    expect(validate(generate({ pages: 1_000_000, durationMs: 86_400_000 })).ok).toBe(true);
+  });
+
+  it.each(["pages", "durationMs", "errorType"])("rejects %s on a config event", (key) => {
+    const value = key === "errorType" ? "Error" : 100;
+    expect(validate({ ...base(), [key]: value }).ok).toBe(false);
+  });
+});
+
 describe("validate: failures", () => {
   it("rejects non-objects", () => {
     for (const input of [null, undefined, 1, "x", [], true]) {
