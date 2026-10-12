@@ -103,7 +103,7 @@ run "worker_roles" {
   assert {
     condition = alltrue([
       for b in cloudflare_workers_script.dashboard.bindings :
-      !contains(["EVENTS", "REJECTS", "RL", "RL_HARD", "RL_COLO", "QUARANTINE", "AE_SQL_TOKEN", "ALERT_WEBHOOK", "ASSETS"], b.name)
+      !contains(["EVENTS", "REJECTS", "RL", "RL_HARD", "RL_COLO", "QUARANTINE", "AE_SQL_TOKEN", "ALERT_WEBHOOK"], b.name)
     ])
     error_message = "the dashboard Worker must have no Analytics Engine, rate limit, KV or secret bindings"
   }
@@ -116,6 +116,18 @@ run "worker_roles" {
   assert {
     condition     = cloudflare_workers_script.dashboard.observability.enabled == false
     error_message = "dashboard observability must be disabled"
+  }
+}
+
+run "assets_kept_across_applies" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for s in [cloudflare_workers_script.telemetry, cloudflare_workers_script.dashboard] :
+      s.keep_assets == true && contains([for b in s.bindings : b.type if b.name == "ASSETS"], "assets")
+    ])
+    error_message = "both Workers must declare the ASSETS binding and keep the assets wrangler uploaded"
   }
 }
 
