@@ -2,12 +2,21 @@ import { describe, expect, it } from "vitest";
 
 import app from "../../dashboard/app.js?raw";
 import html from "../../dashboard/index.html?raw";
+import publicHtml from "../../dashboard/public.html?raw";
+import vendorReadme from "../../dashboard/vendor/README.md?raw";
 
 describe("dashboard assets", () => {
-  it("pins an exact uPlot version", () => {
-    const versions = [...html.matchAll(/uplot@(\d+\.\d+\.\d+)\//g)].map((m) => m[1]);
-    expect(versions.length).toBeGreaterThan(0);
-    expect(new Set(versions).size).toBe(1);
+  it("self-hosts uPlot at a pinned version, with no external URLs", () => {
+    expect(vendorReadme).toContain("1.6.31");
+    expect(html).toContain('src="vendor/uPlot.iife.min.js"');
+    expect(html).toContain('href="vendor/uPlot.min.css"');
+    for (const page of [html, publicHtml, app]) {
+      expect(page).not.toMatch(/https?:\/\//);
+    }
+  });
+
+  it("loads no https script src in index.html", () => {
+    expect([...html.matchAll(/<script[^>]*\ssrc="(https?:[^"]*)"/g)]).toEqual([]);
   });
 
   it("states the accepted biases and the suppression rule", () => {

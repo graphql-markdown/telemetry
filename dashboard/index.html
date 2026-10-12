@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>GraphQL-Markdown telemetry</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uplot@1.6.31/dist/uPlot.min.css">
+  <link rel="stylesheet" href="vendor/uPlot.min.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -52,7 +52,7 @@
     <p>Accepted biases: opt-out, blocked-network and corporate-proxy users are undercounted; custom formatters and loaders are masked as "custom"; <code>firstRun</code> is approximate (especially in containers); fake events are only mitigated by the anti-abuse layers. Events are an upper bound, distinct configs a lower bound; the true number lies in between. Local and CI units differ (one event per distinct config per machine vs one per CI run); "all" adds them together. Totals of debounced measures are sums of daily values.</p>
   </footer>
 
-  <script src="https://cdn.jsdelivr.net/npm/uplot@1.6.31/dist/uPlot.iife.min.js"></script>
+  <script src="vendor/uPlot.iife.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

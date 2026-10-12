@@ -5,38 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>GraphQL-Markdown public usage statistics</title>
-  <style>
-    body { max-width: 760px; margin: 2rem auto; padding: 0 1rem; font: 15px/1.5 system-ui, sans-serif; }
-    table { border-collapse: collapse; width: 100%; margin-bottom: 1.5rem; }
-    th, td { border-bottom: 1px solid #8884; padding: .2rem .4rem; text-align: left; }
-    td.n, th.n { text-align: right; }
-    small { opacity: .75; }
-  </style>
+  <link rel="stylesheet" href="public.css">
 </head>
 <body>
   <h1>GraphQL-Markdown usage statistics</h1>
   <p>Anonymous, aggregated, weekly. Raw events from local runs only (CI and quarantined events excluded). Last 90 days.</p>
   <div id="out"></div>
   <p><small><strong>n&lt;5 suppressed:</strong> values with fewer than 5 events in the range are hidden. Opt-out and blocked-network users are undercounted.</small></p>
-  <script>
-    (function () {
-      var DIMS = [["formatter", "Formatter"], ["graphqlMajor", "GraphQL major"], ["loader.kind", "Loader kinds"], ["pkgVersion", "Versions"]];
-      var out = document.getElementById("out");
-      DIMS.forEach(function (d) {
-        fetch("/public/v1/stats?dim=" + encodeURIComponent(d[0])).then(function (r) { return r.json(); }).then(function (data) {
-          var h = document.createElement("h2"); h.textContent = d[1]; out.appendChild(h);
-          var t = document.createElement("table");
-          var head = t.insertRow();
-          ["Value", "Events (90 days)"].forEach(function (x, i) { var c = document.createElement("th"); c.textContent = x; if (i) c.className = "n"; head.appendChild(c); });
-          (data.totals || []).forEach(function (row) {
-            var tr = t.insertRow();
-            var a = tr.insertCell(); a.textContent = row.value;
-            var b = tr.insertCell(); b.textContent = Math.round(row.n).toLocaleString("en-US"); b.className = "n";
-          });
-          out.appendChild(t);
-        });
-      });
-    })();
-  </script>
+  <script src="public.js"></script>
 </body>
 </html>
