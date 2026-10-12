@@ -2,6 +2,7 @@
 
 locals {
   worker_name = "gqlmd-telemetry"
+  bundle_path = coalesce(var.worker_bundle_path, "${path.module}/../worker/dist/index.js")
 }
 
 resource "cloudflare_d1_database" "telemetry" {
@@ -25,11 +26,12 @@ resource "cloudflare_api_token" "ae_sql" {
       permission_groups = [
         { id = data.cloudflare_api_token_permission_groups_list.analytics_read.result[0].id },
       ]
-      resources = {
+      # v5 takes resources as a JSON-encoded string.
+      resources = jsonencode({
         "com.cloudflare.api.account.${var.account_id}" = "*"
-      }
+      })
     },
-  ] # verify: policies and resources attribute shapes against the v5 schema
+  ]
 }
 
 resource "cloudflare_workers_script" "telemetry" {
@@ -38,7 +40,7 @@ resource "cloudflare_workers_script" "telemetry" {
 
   # Module worker bundled by `wrangler deploy --dry-run --outdir dist`.
   main_module        = "index.js"
-  content            = file("${path.module}/../worker/dist/index.js") # verify: v5 may prefer content_file + content_sha256
+  content            = file(local.bundle_path) # verify: v5 may prefer content_file + content_sha256
   compatibility_date = "2026-08-01"
 
   # verify: the dashboard/ static assets (ASSETS binding, run_worker_first) need a
@@ -144,11 +146,10 @@ resource "cloudflare_workers_cron_trigger" "rollup" {
 }
 
 resource "cloudflare_workers_custom_domain" "telemetry" {
-  account_id  = var.account_id
-  zone_id     = var.zone_id
-  hostname    = var.domain
-  service     = cloudflare_workers_script.telemetry.script_name
-  environment = "production" # verify: attribute still required in v5
+  account_id = var.account_id
+  zone_id    = var.zone_id
+  hostname   = var.domain
+  service    = cloudflare_workers_script.telemetry.script_name
 }
 
 check "observability_disabled" {

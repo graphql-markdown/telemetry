@@ -24,12 +24,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code Base
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
       - name: Install modules
         run: bun install --frozen-lockfile
@@ -45,14 +45,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code Base
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       # worker.tofu reads the bundled Worker with file(),
       # so the bundle (worker/dist/index.js) must exist before `tofu validate`.
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
       - name: Build Worker bundle
         run: |
@@ -60,7 +60,7 @@ jobs:
           bun run build
 
       - name: Setup OpenTofu
-        uses: opentofu/setup-opentofu@v1
+        uses: opentofu/setup-opentofu@9d84900f3238fab8cd84ce47d658d25dd008be2f # v1.0.8
         with:
           tofu_version_file: .opentofu-version
 
@@ -72,12 +72,14 @@ jobs:
         run: |
           tofu init -backend=false
           tofu validate
+          tofu test
 
       - name: Init and validate (infra/bootstrap)
         working-directory: infra/bootstrap
         run: |
           tofu init -backend=false
           tofu validate
+          tofu test
 
   # There is no apply job yet. When it exists, run after `tofu apply` and
   # before the Worker is used:
