@@ -1,7 +1,7 @@
-import { describe, expect, it, vi, type Mock } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 import type { Env } from "../src/env";
-import worker from "../src/index";
+import worker, { QUARANTINE_MEMORY_MAX, resetQuarantineMemory } from "../src/index";
 import { gzip, mockEnv, payload, post } from "./helpers";
 
 const JSON_HEADERS = { "content-type": "application/json" };
@@ -320,9 +320,22 @@ describe("fingerprints", () => {
 });
 
 describe("anti-abuse", () => {
+  beforeEach(() => resetQuarantineMemory());
+  afterEach(() => vi.useRealTimers());
+
   const limiter = (success: boolean) => ({
     limit: vi.fn(async (_options: { key: string }) => ({ success })),
   });
+  /** In-memory KV mock; TTLs are not simulated. */
+  const kv = () => {
+    const store = new Map<string, string>();
+    return {
+      get: vi.fn(async (key: string) => store.get(key) ?? null),
+      put: vi.fn(async (key: string, value: string, _options?: unknown) => {
+        store.set(key, value);
+      }),
+    };
+  };
   const send = (env: Env, extra: Record<string, unknown>, colo = "AMS") =>
     worker.fetch(
       post(JSON.stringify(payload(extra)), JSON_HEADERS, { cf: { colo } }),
@@ -351,19 +364,102 @@ describe("anti-abuse", () => {
 
   it("flags quarantined events and keeps flagging them while the entry exists", async () => {
     const extra = { config: { schema: "<path>", baseURL: "<url>" } };
-    const tripped = mockEnv({ RL: limiter(false), RL_HARD: limiter(true) } as Partial<Env>);
+    const QUARANTINE = kv();
+    const tripped = mockEnv({ RL: limiter(false), RL_HARD: limiter(true), QUARANTINE } as unknown as Partial<Env>);
     expect((await send(tripped.env, extra, "FRA")).status).toBe(202);
     expect(quarantinedBlob(tripped.events)).toBe("1");
 
-    // Rate is back to normal, but the cached quarantine entry is still there.
-    const calm = mockEnv({ RL: limiter(true), RL_HARD: limiter(true) } as Partial<Env>);
+    // Rate is back to normal, but the stored quarantine entry is still there.
+    const calm = mockEnv({ RL: limiter(true), RL_HARD: limiter(true), QUARANTINE } as unknown as Partial<Env>);
     expect((await send(calm.env, extra, "FRA")).status).toBe(202);
     expect(quarantinedBlob(calm.events)).toBe("1");
 
     // Another colo is not affected.
-    const other = mockEnv({ RL: limiter(true), RL_HARD: limiter(true) } as Partial<Env>);
+    const other = mockEnv({ RL: limiter(true), RL_HARD: limiter(true), QUARANTINE } as unknown as Partial<Env>);
     await send(other.env, extra, "SYD");
     expect(quarantinedBlob(other.events)).toBe("0");
+  });
+
+  it("writes the quarantine key once, with a 1 h TTL, while the limit keeps tripping", async () => {
+    const extra = { config: { schema: "<path>", baseURL: "<url>" } };
+    const QUARANTINE = kv();
+    const { env, events } = mockEnv({ RL: limiter(false), RL_HARD: limiter(true), QUARANTINE } as unknown as Partial<Env>);
+    await send(env, extra, "FRA");
+    await send(env, extra, "FRA");
+    const fp = events.writeDataPoint.mock.calls[0][0].blobs[1];
+    expect(QUARANTINE.put).toHaveBeenCalledTimes(1);
+    expect(QUARANTINE.put).toHaveBeenCalledWith(`q:${fp}:FRA`, "1", { expirationTtl: 3600 });
+    expect(quarantinedBlob(events, 1)).toBe("1");
+  });
+
+  it("answers from memory without reading KV once the key is known", async () => {
+    const extra = { config: { schema: "<path>", baseURL: "<url>" } };
+    const QUARANTINE = kv();
+    const tripped = mockEnv({ RL: limiter(false), RL_HARD: limiter(true), QUARANTINE } as unknown as Partial<Env>);
+    await send(tripped.env, extra, "FRA");
+    expect(QUARANTINE.put).toHaveBeenCalledTimes(1);
+    QUARANTINE.get.mockClear();
+    const calm = mockEnv({ RL: limiter(true), RL_HARD: limiter(true), QUARANTINE } as unknown as Partial<Env>);
+    await send(calm.env, extra, "FRA");
+    await send(calm.env, extra, "FRA");
+    expect(quarantinedBlob(calm.events, 1)).toBe("1");
+    expect(QUARANTINE.get).not.toHaveBeenCalled();
+    expect(QUARANTINE.put).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads KV once on a trip and does not read it again before writing", async () => {
+    const QUARANTINE = kv();
+    const { env } = mockEnv({ RL: limiter(false), RL_HARD: limiter(true), QUARANTINE } as unknown as Partial<Env>);
+    await send(env, { config: { schema: "<path>", baseURL: "<url>" } }, "FRA");
+    expect(QUARANTINE.get).toHaveBeenCalledTimes(1);
+    expect(QUARANTINE.put).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats a failing KV as not quarantined, skips it for 5 minutes, and keeps memory quarantine", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-12T10:00:00Z"));
+    const QUARANTINE = {
+      get: vi.fn(async () => {
+        throw new Error("kv down");
+      }),
+      put: vi.fn(async () => {
+        throw new Error("kv down");
+      }),
+    };
+    const extra = { config: { schema: "<path>", baseURL: "<url>" } };
+    const clean = mockEnv({ RL: limiter(true), RL_HARD: limiter(true), QUARANTINE } as unknown as Partial<Env>);
+    expect((await send(clean.env, extra)).status).toBe(202);
+    expect(quarantinedBlob(clean.events)).toBe("0");
+    expect(QUARANTINE.get).toHaveBeenCalledTimes(1);
+
+    // Breaker open: neither get nor put is called, the trip is still flagged.
+    const tripped = mockEnv({ RL: limiter(false), RL_HARD: limiter(true), QUARANTINE } as unknown as Partial<Env>);
+    expect((await send(tripped.env, extra)).status).toBe(202);
+    expect(quarantinedBlob(tripped.events)).toBe("1");
+    const calm = mockEnv({ RL: limiter(true), RL_HARD: limiter(true), QUARANTINE } as unknown as Partial<Env>);
+    await send(calm.env, extra);
+    expect(quarantinedBlob(calm.events)).toBe("1");
+    expect(QUARANTINE.get).toHaveBeenCalledTimes(1);
+    expect(QUARANTINE.put).not.toHaveBeenCalled();
+
+    // After 5 minutes KV is tried again.
+    vi.setSystemTime(new Date("2026-10-12T10:05:01Z"));
+    const other = mockEnv({ RL: limiter(true), RL_HARD: limiter(true), QUARANTINE } as unknown as Partial<Env>);
+    await send(other.env, { config: { schema: "<path>", id: "<string>" } }, "SYD");
+    expect(QUARANTINE.get).toHaveBeenCalledTimes(2);
+  });
+
+  it("bounds the in-memory map", async () => {
+    const { env } = mockEnv({ RL: limiter(false), RL_HARD: limiter(true) } as Partial<Env>);
+    for (let i = 0; i < QUARANTINE_MEMORY_MAX + 5; i += 1) {
+      await send(env, { pkgVersion: `1.0.${i}` });
+    }
+    // The oldest entry was evicted, so with RL calm it is no longer flagged.
+    const calm = mockEnv({ RL: limiter(true), RL_HARD: limiter(true) } as Partial<Env>);
+    await send(calm.env, { pkgVersion: "1.0.0" });
+    expect(quarantinedBlob(calm.events)).toBe("0");
+    await send(calm.env, { pkgVersion: `1.0.${QUARANTINE_MEMORY_MAX + 4}` });
+    expect(quarantinedBlob(calm.events, 1)).toBe("1");
   });
 
   it("samples 1 in 20 above the hard ceiling, weighted, never a full drop", async () => {

@@ -17,3 +17,8 @@ output "d1_database_id" {
   description = "ID of the D1 database (substituted into wrangler.jsonc by scripts/deploy.sh)."
   value       = cloudflare_d1_database.telemetry.id
 }
+
+output "quarantine_kv_id" {
+  description = "ID of the quarantine KV namespace (substituted into wrangler.jsonc by scripts/deploy.sh)."
+  value       = cloudflare_workers_kv_namespace.quarantine.id
+}

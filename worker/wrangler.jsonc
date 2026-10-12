@@ -37,6 +37,13 @@
     }
   ],
 
+  // Quarantine flags (key `q:${fp}:${colo}`, TTL 1 h). The Cache API does not work on
+  // workers.dev, so the flag lives in KV. id is a placeholder for local and test runs;
+  // scripts/deploy.sh substitutes the real one from `tofu output quarantine_kv_id`.
+  "kv_namespaces": [
+    { "binding": "QUARANTINE", "id": "00000000000000000000000000000001" }
+  ],
+
   // Daily rollup target. database_id is a placeholder for local and test runs;
   // the deployed binding is created by infra/worker.tofu.
   // Deploy and remote migrations go through scripts/deploy.sh, which substitutes the real id.

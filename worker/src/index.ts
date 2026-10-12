@@ -85,10 +85,39 @@ const isRetired = (env: Env, version: unknown): boolean => {
 
 const QUARANTINE_TTL_SECONDS = 3600;
 
-/** Cache API key for a quarantine entry. The Cache API needs a URL. */
-const quarantineRequest = (fp: string, colo: string): Request => {
-  return new Request(`https://quarantine.invalid/quarantine:${fp}:${colo}`);
+/** Max quarantine entries kept in memory per isolate. */
+export const QUARANTINE_MEMORY_MAX = 10_000;
+/** How long a KV hit is trusted in memory (its real remaining TTL is unknown). */
+const KV_HIT_MEMORY_MS = 60_000;
+/** After a KV error, this isolate skips KV for this long (circuit breaker). */
+const KV_BACKOFF_MS = 5 * 60_000;
+
+/**
+ * Per-isolate quarantine layer: key to expiry (ms). Every entry gets a TTL of
+ * the same order, so insertion order is expiry order and eviction pops from the
+ * front. It is the primary layer: an attacker exhausting the KV quota (reads or
+ * writes) cannot switch quarantine off for what this isolate has seen.
+ */
+const quarantineMemory = new Map<string, number>();
+let kvDownUntil = 0;
+
+/** @internal Test helper: forget the in-memory entries and the KV backoff. */
+export const resetQuarantineMemory = (): void => {
+  quarantineMemory.clear();
+  kvDownUntil = 0;
 };
+
+const remember = (key: string, now: number, ttlMs: number): void => {
+  quarantineMemory.delete(key);
+  for (const [oldest, expiresAt] of quarantineMemory) {
+    if (quarantineMemory.size < QUARANTINE_MEMORY_MAX && expiresAt > now) break;
+    quarantineMemory.delete(oldest);
+  }
+  quarantineMemory.set(key, now + ttlMs);
+};
+
+/** KV key for a quarantine entry. */
+const quarantineKey = (fp: string, colo: string): string => `q:${fp}:${colo}`;
 
 /** Sampling denominators when a flood ceiling trips. */
 export const SAMPLE_HARD = 20;
@@ -102,7 +131,7 @@ const keepOneIn = (n: number): boolean => {
 };
 
 /**
- * Anti-abuse for one `(fp, colo)`. `colo` is used in memory and in the cache
+ * Anti-abuse for one `(fp, colo)`. `colo` is used in memory and in the KV
  * key only, never stored. Above the hard ceiling the event is sampled, never
  * dropped outright: kept with probability 1/SAMPLE_HARD and weighted
  * accordingly (null when sampled out). Quarantine only sets a flag.
@@ -121,18 +150,42 @@ const checkAbuse = async (
     }
     flooded = true;
   }
-  const cache = caches.default;
-  const entry = quarantineRequest(fp, colo);
-  let quarantined = (await cache.match(entry)) !== undefined;
+  const entry = quarantineKey(fp, colo);
+  const now = Date.now();
+  // Memory first: a hit never touches KV.
+  let known = (quarantineMemory.get(entry) ?? 0) > now;
+  // KV is a best-effort shared layer. Fail-open on purpose: a KV error (quota,
+  // outage) means "not quarantined from KV" and skips KV for KV_BACKOFF_MS in
+  // this isolate. Quarantine is only a flag, and failing closed would let an
+  // attacker flag all real traffic by exhausting the quota.
+  if (!known && env.QUARANTINE && now >= kvDownUntil) {
+    try {
+      known = (await env.QUARANTINE.get(entry)) != null;
+      if (known) {
+        remember(entry, now, KV_HIT_MEMORY_MS);
+      }
+    } catch {
+      kvDownUntil = now + KV_BACKOFF_MS;
+    }
+  }
+  let quarantined = known;
   if (env.RL && !(await env.RL.limit({ key })).success) {
     quarantined = true;
-    // Written (and so renewed) every time the limit trips.
-    await cache.put(
-      entry,
-      new Response(null, {
-        headers: { "cache-control": `max-age=${QUARANTINE_TTL_SECONDS}` },
-      }),
-    );
+    // Memory always records the trip. KV is written only when the key was not
+    // already known: at most one write per (fp, colo) per TTL, which keeps a
+    // flood inside the KV free tier (1000 writes a day).
+    if (!known) {
+      remember(entry, now, QUARANTINE_TTL_SECONDS * 1000);
+      if (env.QUARANTINE && now >= kvDownUntil) {
+        try {
+          await env.QUARANTINE.put(entry, "1", {
+            expirationTtl: QUARANTINE_TTL_SECONDS,
+          });
+        } catch {
+          kvDownUntil = now + KV_BACKOFF_MS;
+        }
+      }
+    }
   }
   return {
     quarantined: quarantined || flooded,
