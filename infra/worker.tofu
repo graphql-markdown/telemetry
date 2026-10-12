@@ -1,8 +1,14 @@
-# The telemetry Worker. Build first (`bun run build`) so ../worker/dist/index.js exists.
+# The telemetry Workers, one bundle deployed twice on workers.dev (the account has no zone):
+# the public ingest Worker and the dashboard Worker, whose whole URL sits behind Access.
+# Build first (`bun run build`) so ../worker/dist/index.js exists.
 
 locals {
-  worker_name = "gqlmd-telemetry"
-  bundle_path = coalesce(var.worker_bundle_path, "${path.module}/../worker/dist/index.js")
+  worker_name    = "gqlmd-telemetry"
+  dashboard_name = "${local.worker_name}-dashboard"
+  ingest_host    = "${local.worker_name}.${var.workers_subdomain}.workers.dev"
+  dashboard_host = "${local.dashboard_name}.${var.workers_subdomain}.workers.dev"
+  access_aud     = coalesce(var.access_aud_override, cloudflare_zero_trust_access_application.dashboard.aud)
+  bundle_path    = coalesce(var.worker_bundle_path, "${path.module}/../worker/dist/index.js")
 }
 
 resource "cloudflare_d1_database" "telemetry" {
@@ -25,7 +31,7 @@ resource "cloudflare_workers_script" "telemetry" {
   content            = file(local.bundle_path) # verify: v5 may prefer content_file + content_sha256
   compatibility_date = "2026-08-01"
 
-  # verify: the dashboard/ static assets (ASSETS binding, run_worker_first) need a
+  # verify: the public/ static assets (ASSETS binding, run_worker_first) need a
   # v5 assets upload session, or deploy the Worker with `wrangler deploy` instead.
 
   # Observability (logs and traces) stays off: no request data is logged.
@@ -100,14 +106,9 @@ resource "cloudflare_workers_script" "telemetry" {
       text = var.alert_webhook
     },
     {
-      name = "ACCESS_TEAM_DOMAIN"
+      name = "ROLE"
       type = "plain_text"
-      text = var.access_team_domain
-    },
-    {
-      name = "ACCESS_AUD"
-      type = "plain_text"
-      text = cloudflare_zero_trust_access_application.dashboard.aud
+      text = "ingest"
     },
     {
       name = "PUBLIC_STATS"
@@ -116,7 +117,7 @@ resource "cloudflare_workers_script" "telemetry" {
     },
   ] # verify: binding attribute names (namespace_id, simple) against the v5 schema
 
-  # wrangler deploy owns the bundle and the static assets after the first deploy;
+  # wrangler deploy owns the bundle and the public/ assets after the first deploy;
   # tofu keeps the bindings and vars but must not overwrite the uploaded script.
   lifecycle {
     ignore_changes = [content]
@@ -132,16 +133,73 @@ resource "cloudflare_workers_cron_trigger" "rollup" {
   ]
 }
 
-resource "cloudflare_workers_custom_domain" "telemetry" {
-  account_id = var.account_id
-  zone_id    = var.zone_id
-  hostname   = var.domain
-  service    = cloudflare_workers_script.telemetry.script_name
+# Dashboard Worker: same bundle, D1 only (no Analytics Engine, rate limit or KV), no cron.
+resource "cloudflare_workers_script" "dashboard" {
+  account_id  = var.account_id
+  script_name = local.dashboard_name
+
+  main_module        = "index.js"
+  content            = file(local.bundle_path) # verify: v5 may prefer content_file + content_sha256
+  compatibility_date = "2026-08-01"
+
+  # verify: the dashboard/ static assets (ASSETS binding, run_worker_first) need a
+  # v5 assets upload session, or deploy the Worker with `wrangler deploy` instead.
+
+  # Observability (logs and traces) stays off: no request data is logged.
+  observability = {
+    enabled = false
+  }
+
+  bindings = [
+    {
+      name = "DB"
+      type = "d1"
+      id   = cloudflare_d1_database.telemetry.id
+    },
+    {
+      name = "ROLE"
+      type = "plain_text"
+      text = "dashboard"
+    },
+    {
+      name = "ACCESS_TEAM_DOMAIN"
+      type = "plain_text"
+      text = var.access_team_domain
+    },
+    {
+      name = "ACCESS_AUD"
+      type = "plain_text"
+      text = local.access_aud
+    },
+  ] # verify: binding attribute names against the v5 schema
+
+  # wrangler deploy owns the bundle and the static assets after the first deploy.
+  lifecycle {
+    ignore_changes = [content]
+  }
+}
+
+# workers.dev URLs: <script>.<account subdomain>.workers.dev. Preview URLs stay off.
+resource "cloudflare_workers_script_subdomain" "telemetry" {
+  account_id       = var.account_id
+  script_name      = cloudflare_workers_script.telemetry.script_name
+  enabled          = true
+  previews_enabled = false # verify: v5 attribute names (enabled, previews_enabled)
+}
+
+resource "cloudflare_workers_script_subdomain" "dashboard" {
+  account_id       = var.account_id
+  script_name      = cloudflare_workers_script.dashboard.script_name
+  enabled          = true
+  previews_enabled = false # verify: v5 attribute names (enabled, previews_enabled)
 }
 
 check "observability_disabled" {
   assert {
-    condition     = cloudflare_workers_script.telemetry.observability.enabled == false
+    condition = alltrue([
+      cloudflare_workers_script.telemetry.observability.enabled == false,
+      cloudflare_workers_script.dashboard.observability.enabled == false,
+    ])
     error_message = "Worker observability must stay disabled: no request data may be logged."
   }
 }

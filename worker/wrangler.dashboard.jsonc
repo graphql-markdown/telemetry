@@ -1,0 +1,36 @@
+{
+  "name": "gqlmd-telemetry-dashboard",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "observability": { "enabled": false },
+
+  // Dashboard Worker, same bundle as wrangler.jsonc. The whole workers.dev URL sits behind
+  // Cloudflare Access (infra/access.tofu); the Worker also verifies the Access JWT on /v1/stats.
+  "workers_dev": true,
+  "preview_urls": false,
+
+  // Picks the routes this Worker serves: /v1/stats* and the assets. Also set by infra/worker.tofu.
+  "vars": { "ROLE": "dashboard" },
+
+  // Dashboard (static page, no build step) served at /. Only the API routes run the Worker first.
+  "assets": {
+    "directory": "../dashboard",
+    "binding": "ASSETS",
+    "run_worker_first": ["/v1/*"]
+  },
+
+  // Stats are read from the rollups. database_id is a placeholder for local and test runs;
+  // scripts/deploy.sh substitutes the real id. No Analytics Engine, rate limit or KV bindings, no crons.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gqlmd-telemetry",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../migrations"
+    }
+  ],
+
+  // ACCESS_TEAM_DOMAIN and ACCESS_AUD are set by infra/worker.tofu and kept across deploys
+  // by keep_vars; local defaults live in worker/.dev.vars.example.
+  "keep_vars": true
+}

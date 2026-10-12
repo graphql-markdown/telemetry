@@ -4,11 +4,15 @@
   "compatibility_date": "2026-08-01",
   "observability": { "enabled": false },
 
-  // Public hostname. Custom domains work with the Cache API (quarantine);
-  // workers.dev does not. The zone must already be on this Cloudflare account.
-  "routes": [
-    { "pattern": "telemetry.graphql-markdown.dev", "custom_domain": true }
-  ],
+  // Ingest Worker, served on workers.dev (the account has no zone, so no routes or custom
+  // domains). The dashboard is a second Worker built from the same bundle:
+  // wrangler.dashboard.jsonc, behind Cloudflare Access.
+  "workers_dev": true,
+  "preview_urls": false,
+
+  // Picks the routes this Worker serves: /v1/event, /public* and the cron.
+  // Also set by infra/worker.tofu; unset (wrangler dev, tests) it serves everything.
+  "vars": { "ROLE": "ingest" },
 
   // Analytics Engine: raw events and payload-free reject counters.
   "analytics_engine_datasets": [
@@ -44,6 +48,14 @@
     { "binding": "QUARANTINE", "id": "00000000000000000000000000000001" }
   ],
 
+  // Public page (static, no build step), served only through the Worker at /public so that
+  // PUBLIC_STATS gating applies. The page's css and js are plain assets (/public.css, /public.js).
+  "assets": {
+    "directory": "../public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/v1/*", "/public", "/public/*"]
+  },
+
   // Daily rollup target. database_id is a placeholder for local and test runs;
   // the deployed binding is created by infra/worker.tofu.
   // Deploy and remote migrations go through scripts/deploy.sh, which substitutes the real id.
@@ -56,16 +68,7 @@
     }
   ],
 
-  // Dashboard (static page, no build step) served at /. Only the API routes and
-  // /public* run the Worker first; "/" is protected by Cloudflare Access at the edge.
-  "assets": {
-    "directory": "../dashboard",
-    "binding": "ASSETS",
-    "run_worker_first": ["/v1/*", "/public", "/public/*"]
-  },
-
-  // Access verification (second check) and the optional public aggregates.
-  // ACCESS_TEAM_DOMAIN, ACCESS_AUD and PUBLIC_STATS are set by infra/worker.tofu and
+  // The optional public aggregates flag. PUBLIC_STATS is set by infra/worker.tofu and
   // kept across deploys by keep_vars; local defaults live in worker/.dev.vars.example.
   "keep_vars": true,
 

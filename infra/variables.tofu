@@ -3,15 +3,14 @@ variable "account_id" {
   type        = string
 }
 
-variable "zone_id" {
-  description = "ID of the Cloudflare zone for graphql-markdown.dev."
+variable "workers_subdomain" {
+  description = "The account's workers.dev subdomain (the <sub> in <script>.<sub>.workers.dev)."
   type        = string
-}
 
-variable "domain" {
-  description = "Public hostname of the telemetry Worker."
-  type        = string
-  default     = "telemetry.graphql-markdown.dev"
+  validation {
+    condition     = length(var.workers_subdomain) > 0
+    error_message = "workers_subdomain must not be empty."
+  }
 }
 
 variable "cloudflare_api_token" {
@@ -57,6 +56,12 @@ variable "dashboard_emails" {
 variable "access_team_domain" {
   description = "Zero Trust team domain, e.g. myteam.cloudflareaccess.com (JWKS host and JWT issuer)."
   type        = string
+}
+
+variable "access_aud_override" {
+  description = "AUD tag of an Access application created by hand. Only for when the provider rejects a workers.dev destination (see README). Null uses the tofu-managed application."
+  type        = string
+  default     = null
 }
 
 variable "public_stats" {
