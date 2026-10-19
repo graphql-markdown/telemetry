@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import app from "../../dashboard/app.js?raw";
+import css from "../../dashboard/style.css?raw";
 import html from "../../dashboard/index.html?raw";
 import publicHtml from "../../public/public.html?raw";
 import vendorReadme from "../../dashboard/vendor/README.md?raw";
@@ -13,6 +14,14 @@ describe("dashboard assets", () => {
     for (const page of [html, publicHtml, app]) {
       expect(page).not.toMatch(/https?:\/\//);
     }
+  });
+
+  it("self-hosts the web fonts, with no external URLs in the stylesheet", () => {
+    expect(vendorReadme).toContain("@fontsource-variable/jost | 5.3.0");
+    expect(vendorReadme).toContain("@fontsource-variable/victor-mono | 5.3.0");
+    expect(css).toContain('url("vendor/jost-latin-wght-normal.woff2")');
+    expect(css).toContain('url("vendor/victor-mono-latin-wght-normal.woff2")');
+    expect(css).not.toMatch(/https?:\/\/|@import/);
   });
 
   it("loads no https script src in index.html", () => {

@@ -4,58 +4,115 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>GraphQL-Markdown telemetry</title>
+  <title>GraphQL-Markdown · Telemetry</title>
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#485e58">
   <link rel="stylesheet" href="vendor/uPlot.min.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div class="shell">
   <header>
-    <h1>GraphQL-Markdown telemetry</h1>
-    <form id="controls" aria-label="Filters">
-      <label>From <input type="date" id="from" required></label>
-      <label>To <input type="date" id="to" required></label>
-      <fieldset>
-        <legend>Measure</legend>
-        <label><input type="radio" name="measure" value="events" checked> events</label>
-        <label><input type="radio" name="measure" value="debounced"> debounced</label>
-        <select id="interval" aria-label="Debounce interval">
-          <option value="1h">1 h</option>
-          <option value="1d">1 d</option>
+    <div class="topline">
+      <div class="brand">
+        <img class="logo" src="logo.svg" alt="" width="44" height="44">
+        <div><div class="eyebrow">GraphQL-Markdown</div><h1>Telemetry overview</h1></div>
+      </div>
+      <div class="top-actions">
+        <span class="status-pill"><span class="dot" id="statusDot"></span><span id="status" role="status">Loading...</span></span>
+        <button class="button" id="themeButton" type="button" aria-label="Toggle theme">◐&nbsp; Theme</button>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div>
+        <h2>Usage &amp; configuration</h2>
+        <p>Adoption, execution context and configuration patterns across GraphQL-Markdown.</p>
+      </div>
+      <div class="range-label" id="rangeLabel"></div>
+    </div>
+
+    <form class="filters" id="controls" aria-label="Filters">
+      <div class="field"><label for="from">From</label><input type="date" id="from" required></div>
+      <div class="field"><label for="to">To</label><input type="date" id="to" required></div>
+      <fieldset class="field">
+        <legend class="group-label">Measure</legend>
+        <div class="segmented">
+          <label><input type="radio" name="measure" value="events" checked> Events</label>
+          <label><input type="radio" name="measure" value="debounced"> Debounced</label>
+          <label><input type="radio" name="measure" value="configs"> Distinct configs</label>
+          <label><input type="radio" name="measure" value="colo_sampled"> Colo sampled</label>
+        </div>
+      </fieldset>
+      <div class="field">
+        <label for="interval">Debounce interval</label>
+        <select id="interval">
+          <option value="1h">1 hour</option>
+          <option value="1d">1 day</option>
         </select>
-        <label><input type="radio" name="measure" value="configs"> distinct configs</label>
-        <label><input type="radio" name="measure" value="colo_sampled"> colo sampled</label>
+      </div>
+      <fieldset class="field">
+        <legend class="group-label">View</legend>
+        <div class="segmented">
+          <label><input type="radio" name="view" value="local" checked> Local</label>
+          <label><input type="radio" name="view" value="ci"> CI</label>
+          <label><input type="radio" name="view" value="all"> All</label>
+        </div>
       </fieldset>
-      <fieldset>
-        <legend>View</legend>
-        <label><input type="radio" name="view" value="local" checked> local</label>
-        <label><input type="radio" name="view" value="ci"> CI</label>
-        <label><input type="radio" name="view" value="all"> all</label>
-      </fieldset>
+      <div class="filter-spacer"></div>
+      <button class="apply" type="submit">Refresh&nbsp; →</button>
     </form>
-    <p id="status" role="status"></p>
   </header>
 
-  <main id="panels">
-    <section data-panel="versions" data-title="Runs per day by version" data-dim="pkgVersion" data-kind="series"></section>
-    <section data-panel="ci" data-title="CI vs local runs per day" data-dim="ci" data-kind="series" data-view="all" data-labels="ci"></section>
-    <section data-panel="provider" data-title="CI provider share" data-dim="ciProvider" data-kind="share" data-view="ci"></section>
-    <section data-panel="formatter" data-title="Formatter share" data-dim="formatter" data-kind="share" data-labels="formatter"></section>
-    <section data-panel="graphql" data-title="GraphQL major version" data-dim="graphqlMajor" data-kind="share"></section>
-    <section data-panel="loader" data-title="Loader kinds" data-dim="loader.kind" data-kind="share"></section>
-    <section data-panel="create" data-title="Scaffold vs wire (create events)" data-dim="event" data-kind="share" data-only="create_scaffold,create_wire"></section>
-    <section data-panel="targets" data-title="Create targets" data-dim="target" data-kind="share"></section>
-    <section data-panel="settings" data-title="Top settings" data-kind="settings"></section>
-    <section data-panel="catalog" data-title="Config catalog" data-kind="catalog"></section>
-    <section data-panel="generate" data-title="Generation" data-kind="generate"></section>
-    <section data-panel="health" data-title="Rejects and quarantined" data-kind="health"></section>
+  <main>
+    <div class="section-head">
+      <div><div class="section-kicker">At a glance</div><h3>Core activity</h3></div>
+      <span class="panel-tag">CURRENT FILTERS</span>
+    </div>
+    <div class="kpis" id="kpis">
+      <article class="kpi"><div class="kpi-top"><span>Events</span><span class="kpi-icon" aria-hidden="true">↗</span></div><div class="kpi-value" data-kpi="events">—</div><div class="kpi-foot" data-kpi-foot="events">Raw events · upper bound</div></article>
+      <article class="kpi"><div class="kpi-top"><span>Distinct configs</span><span class="kpi-icon" aria-hidden="true">⌘</span></div><div class="kpi-value" data-kpi="configs">—</div><div class="kpi-foot" data-kpi-foot="configs">Sum of daily distinct configs</div></article>
+      <article class="kpi"><div class="kpi-top"><span>Debounced activity</span><span class="kpi-icon" aria-hidden="true">◷</span></div><div class="kpi-value" data-kpi="debounced">—</div><div class="kpi-foot" data-kpi-foot="debounced">Debounced events</div></article>
+      <article class="kpi"><div class="kpi-top"><span>Quarantined events</span><span class="kpi-icon" aria-hidden="true">◇</span></div><div class="kpi-value" data-kpi="quarantined">—</div><div class="kpi-foot" data-kpi-foot="quarantined">All views · excluded from usage panels</div></article>
+    </div>
+
+    <div class="section-head">
+      <div><div class="section-kicker">Trends &amp; breakdowns</div><h3>Usage patterns</h3></div>
+    </div>
+    <div class="grid" id="panels">
+      <section class="panel wide" data-panel="versions" data-title="Runs per day by version" data-sub="Daily activity split by package version" data-tag="TIME SERIES" data-dim="pkgVersion" data-kind="series"></section>
+      <section class="panel" data-panel="ci" data-title="CI vs local runs per day" data-sub="Runs per day by execution context" data-tag="TIME SERIES" data-dim="ci" data-kind="series" data-view="all" data-labels="ci"></section>
+      <section class="panel" data-panel="provider" data-title="CI provider share" data-sub="Distribution of detected CI providers" data-tag="BREAKDOWN" data-dim="ciProvider" data-kind="share" data-view="ci"></section>
+      <section class="panel" data-panel="formatter" data-title="Formatter share" data-sub="Custom formatters are masked as “custom”" data-tag="BREAKDOWN" data-dim="formatter" data-kind="share" data-labels="formatter"></section>
+      <section class="panel" data-panel="graphql" data-title="GraphQL major version" data-sub="Usage by GraphQL major version" data-tag="BREAKDOWN" data-dim="graphqlMajor" data-kind="share"></section>
+      <section class="panel" data-panel="loader" data-title="Loader kinds" data-sub="Custom loaders are masked as “custom”" data-tag="BREAKDOWN" data-dim="loader.kind" data-kind="share"></section>
+      <section class="panel" data-panel="create" data-title="Scaffold vs wire" data-sub="Create-event type distribution" data-tag="CREATE EVENTS" data-dim="event" data-kind="share" data-only="create_scaffold,create_wire"></section>
+      <section class="panel" data-panel="targets" data-title="Create targets" data-sub="Targets selected for create operations" data-tag="BREAKDOWN" data-dim="target" data-kind="share"></section>
+      <section class="panel" data-panel="settings" data-title="Top settings" data-sub="How often each setting is set" data-tag="CONFIGURATION" data-kind="settings"></section>
+      <section class="panel wide" data-panel="generate" data-title="Generation" data-sub="Run duration, page counts and failures" data-tag="GENERATION" data-kind="generate"></section>
+      <section class="panel wide" data-panel="catalog" data-title="Config catalog" data-sub="Masked configurations observed over the selected range" data-kind="catalog" data-search="Filter catalog"></section>
+      <section class="panel wide" data-panel="health" data-title="Telemetry health" data-sub="Rejected and quarantined events are reported separately from usage panels" data-tag="DATA QUALITY" data-kind="health"></section>
+    </div>
   </main>
 
   <footer>
+    <h3>Reading this dashboard</h3>
     <p><strong>n&lt;5 suppressed:</strong> any value with fewer than 5 events over the selected range is hidden and counted as suppressed.</p>
-    <p>Accepted biases: opt-out, blocked-network and corporate-proxy users are undercounted; custom formatters and loaders are masked as "custom"; <code>firstRun</code> is approximate (especially in containers); fake events are only mitigated by the anti-abuse layers. Events are an upper bound, distinct configs a lower bound; the true number lies in between. Local and CI units differ (one event per distinct config per machine vs one per CI run); "all" adds them together. Totals of debounced measures are sums of daily values.</p>
+    <div class="footnotes">
+      <div>
+        <strong>Accepted biases</strong>
+        <p>Opt-out, blocked-network and corporate-proxy users are undercounted. Custom formatters and loaders are masked as "custom". <code>firstRun</code> is approximate (especially in containers). Fake events are only mitigated by the anti-abuse layers.</p>
+      </div>
+      <div>
+        <strong>Interpreting totals</strong>
+        <p>Events are an upper bound, distinct configs a lower bound; the true number lies in between. Local and CI units differ (one event per distinct config per machine vs one per CI run); "all" adds them together. Totals of debounced measures are sums of daily values.</p>
+      </div>
+    </div>
   </footer>
+</div>
 
-  <script src="vendor/uPlot.iife.min.js"></script>
-  <script src="app.js"></script>
+<script src="vendor/uPlot.iife.min.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

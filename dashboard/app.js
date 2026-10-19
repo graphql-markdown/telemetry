@@ -3,12 +3,18 @@
   "use strict";
 
   var SETTINGS = ["diffMethod", "force", "hierarchy", "mdxParser", "pretty", "telemetry"];
-  var PALETTE = ["#2f6fed", "#e8590c", "#2f9e44", "#ae3ec9", "#f08c00", "#1098ad", "#c2255c", "#868e96"];
+  var SERIES_COLORS = 8; /* --s1..--s8 in style.css, from the website palette */
   var LABELS = { ci: { "0": "local", "1": "CI" }, formatter: { "": "not set" } };
+  var THEME_KEY = "gqlmd-telemetry-theme";
 
+  var root = document.documentElement;
   var form = document.getElementById("controls");
   var status = document.getElementById("status");
+  var statusDot = document.getElementById("statusDot");
+  var rangeLabel = document.getElementById("rangeLabel");
+  var interval = document.getElementById("interval");
   var charts = [];
+  var generation = 0;
 
   function el(tag, text, cls) {
     var node = document.createElement(tag);
@@ -18,10 +24,19 @@
   }
   function iso(date) { return date.toISOString().slice(0, 10); }
   function fmt(n) { return Number(n).toLocaleString("en-US", { maximumFractionDigits: 1 }); }
+  function day(s) { return new Date(s + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }); }
+  function sum(totals) { return totals.reduce(function (s, t) { return s + t.n; }, 0); }
+  function cssVar(name) { return getComputedStyle(root).getPropertyValue(name).trim(); }
+  function seriesVar(i) { return "--s" + ((i % SERIES_COLORS) + 1); }
+
+  function setStatus(text, state) {
+    status.textContent = text;
+    statusDot.className = "dot" + (state ? " " + state : "");
+  }
 
   function params() {
     var kind = form.elements.measure.value;
-    var measure = kind === "events" ? "raw" : kind === "configs" ? "debounced_1d" : kind === "colo_sampled" ? "colo_sampled" : "debounced_" + document.getElementById("interval").value;
+    var measure = kind === "events" ? "raw" : kind === "configs" ? "debounced_1d" : kind === "colo_sampled" ? "colo_sampled" : "debounced_" + interval.value;
     return { from: form.elements.from.value, to: form.elements.to.value, measure: measure, view: form.elements.view.value };
   }
 
@@ -34,6 +49,7 @@
   }
 
   function table(headers, rows, numericFrom) {
+    var wrap = el("div", undefined, "table-wrap");
     var t = el("table");
     var head = el("tr");
     headers.forEach(function (h, i) { head.appendChild(el("th", h, i >= numericFrom ? "num" : "")); });
@@ -45,27 +61,64 @@
       body.appendChild(tr);
     });
     t.appendChild(body);
-    return t;
+    wrap.appendChild(t);
+    return wrap;
   }
   function details(summary, node) {
     var d = el("details"); d.appendChild(el("summary", summary)); d.appendChild(node); return d;
   }
+  function empty(title, text, cls) {
+    var box = el("div", undefined, "empty" + (cls ? " " + cls : ""));
+    box.appendChild(el("strong", title));
+    box.appendChild(el("span", text));
+    return box;
+  }
+  function noData() { return empty("No data in this range", "Every value is suppressed (n<5) or nothing was recorded."); }
   function suppressedNote(n) {
-    return el("p", n > 0 ? n + " value(s) hidden (n<5)" : "n<5 suppressed", "note");
+    return el("div", n > 0 ? n + " value(s) hidden (n<5)" : "n<5 suppressed", "privacy");
   }
   function reset(section) {
     section.textContent = "";
-    section.appendChild(el("h2", section.dataset.title));
+    var head = el("div", undefined, "panel-head");
+    var titles = el("div");
+    titles.appendChild(el("h4", section.dataset.title));
+    if (section.dataset.sub) titles.appendChild(el("div", section.dataset.sub, "panel-sub"));
+    head.appendChild(titles);
+    if (section.dataset.search) {
+      var search = el("input", undefined, "search");
+      search.type = "search";
+      search.name = section.dataset.panel + "Search";
+      search.placeholder = section.dataset.search;
+      search.setAttribute("aria-label", section.dataset.search);
+      head.appendChild(search);
+    } else if (section.dataset.tag) {
+      head.appendChild(el("span", section.dataset.tag, "panel-tag"));
+    }
+    section.appendChild(head);
   }
   function labelOf(section, value) {
     var map = LABELS[section.dataset.labels];
     return map && map[value] !== undefined ? map[value] : value;
   }
 
+  function plot(chart) {
+    var ink = cssVar("--muted");
+    var grid = cssVar("--line");
+    var axis = { stroke: ink, grid: { stroke: grid, width: 1 }, ticks: { stroke: grid, width: 1 } };
+    chart.plot = new window.uPlot({
+      width: Math.max(260, chart.holder.clientWidth), height: 240,
+      series: [{}].concat(chart.labels.map(function (label, i) {
+        var color = cssVar(seriesVar(i));
+        return { label: label, stroke: color, width: 2, points: { size: 5, fill: color } };
+      })),
+      axes: [axis, axis],
+    }, chart.cols, chart.holder);
+  }
+
   function renderSeries(section, data) {
     var days = Array.from(new Set(data.series.map(function (r) { return r.day; }))).sort();
     var values = data.totals.map(function (t) { return t.value; });
-    if (!days.length) { section.appendChild(el("p", "No data (suppressed or empty).", "note")); section.appendChild(suppressedNote(data.suppressed_count)); return; }
+    if (!days.length) { section.appendChild(noData()); section.appendChild(suppressedNote(data.suppressed_count)); return; }
     var lookup = {};
     data.series.forEach(function (r) { lookup[r.day + "|" + r.value] = r.n; });
     var cols = [days.map(function (d) { return Date.parse(d + "T00:00:00Z") / 1000; })];
@@ -73,17 +126,9 @@
     var holder = el("div", undefined, "chart");
     section.appendChild(holder);
     if (window.uPlot) {
-      var dark = matchMedia("(prefers-color-scheme: dark)").matches;
-      var ink = dark ? "#e6eaf0" : "#1b1f24";
-      var grid = dark ? "#2d3640" : "#d5dbe3";
-      var opts = {
-        width: Math.max(300, section.clientWidth - 40), height: 240,
-        series: [{}].concat(values.map(function (v, i) {
-          return { label: labelOf(section, v), stroke: PALETTE[i % PALETTE.length], width: 2 };
-        })),
-        axes: [{ stroke: ink, grid: { stroke: grid } }, { stroke: ink, grid: { stroke: grid } }],
-      };
-      charts.push(new window.uPlot(opts, cols, holder));
+      var chart = { holder: holder, cols: cols, labels: values.map(function (v) { return labelOf(section, v); }) };
+      plot(chart);
+      charts.push(chart);
     }
     var headers = ["Day"].concat(values.map(function (v) { return labelOf(section, v); }));
     var rows = days.map(function (d) { return [d].concat(values.map(function (v) { return fmt(lookup[d + "|" + v] || 0); })); });
@@ -94,13 +139,19 @@
   function bars(totals, label) {
     var max = Math.max.apply(null, totals.map(function (t) { return t.n; }).concat([1]));
     var ul = el("ul", undefined, "bars");
-    totals.forEach(function (t) {
+    totals.forEach(function (t, i) {
       var li = el("li");
-      li.appendChild(el("span", label(t.value)));
+      var name = label(t.value);
+      var text = el("span", name, "label");
+      text.title = name;
+      li.appendChild(text);
+      var track = el("span", undefined, "track");
+      track.setAttribute("aria-hidden", "true");
       var bar = el("span", undefined, "bar");
       bar.style.width = Math.max(2, (t.n / max) * 100) + "%";
-      bar.setAttribute("aria-hidden", "true");
-      li.appendChild(bar);
+      bar.style.background = "var(" + seriesVar(i) + ")";
+      track.appendChild(bar);
+      li.appendChild(track);
       li.appendChild(el("span", fmt(t.n), "n"));
       ul.appendChild(li);
     });
@@ -110,7 +161,7 @@
   function renderShare(section, data) {
     var only = section.dataset.only ? section.dataset.only.split(",") : null;
     var totals = data.totals.filter(function (t) { return !only || only.indexOf(t.value) !== -1; });
-    if (!totals.length) { section.appendChild(el("p", "No data (suppressed or empty).", "note")); }
+    if (!totals.length) { section.appendChild(noData()); }
     else {
       var label = function (v) { return labelOf(section, v); };
       section.appendChild(bars(totals, label));
@@ -124,9 +175,9 @@
       return get("/v1/stats", Object.assign({ dim: "setting." + key }, query));
     })).then(function (all) {
       var freq = all.map(function (d, i) {
-        return { value: SETTINGS[i], n: d.totals.reduce(function (s, t) { return s + t.n; }, 0) };
+        return { value: SETTINGS[i], n: sum(d.totals) };
       }).filter(function (t) { return t.n > 0; }).sort(function (a, b) { return b.n - a.n; });
-      if (!freq.length) section.appendChild(el("p", "No data (suppressed or empty).", "note"));
+      if (!freq.length) section.appendChild(noData());
       else section.appendChild(bars(freq, function (v) { return v; }));
       var rows = [];
       all.forEach(function (d, i) { d.totals.forEach(function (t) { rows.push([SETTINGS[i], t.value, fmt(t.n)]); }); });
@@ -139,17 +190,27 @@
     var rows = data.configs.map(function (c) {
       return [JSON.stringify(c.config), c.versions.join(", "), c.first_seen, c.last_seen, fmt(c.events), fmt(c.debounced_events)];
     });
-    var t = table(["Masked config", "Versions", "First seen", "Last seen", "Events", "Debounced"], rows, 4);
-    t.querySelectorAll("td:first-child").forEach(function (td) {
+    if (!rows.length) { section.appendChild(noData()); section.appendChild(suppressedNote(data.suppressed_count)); return; }
+    var wrap = table(["Masked config", "Versions", "First seen", "Last seen", "Events", "Debounced"], rows, 4);
+    wrap.querySelectorAll("td:first-child").forEach(function (td) {
       var pre = el("pre", td.textContent); td.textContent = ""; td.appendChild(pre);
     });
-    section.appendChild(t);
+    var search = section.querySelector(".search");
+    if (search) {
+      search.addEventListener("input", function () {
+        var q = search.value.toLowerCase();
+        wrap.querySelectorAll("tbody tr").forEach(function (tr) {
+          tr.classList.toggle("hidden", q !== "" && tr.textContent.toLowerCase().indexOf(q) === -1);
+        });
+      });
+    }
+    section.appendChild(wrap);
     section.appendChild(suppressedNote(data.suppressed_count));
   }
 
   function renderGenerate(section, data) {
     if (data.runs === null && !data.versions.length) {
-      section.appendChild(el("p", "No data (suppressed or empty).", "note"));
+      section.appendChild(noData());
     } else {
       var dash = function (v) { return v === null ? "-" : fmt(v); };
       section.appendChild(table(["Metric", "p50", "p95"], [
@@ -172,10 +233,9 @@
       get("/v1/stats", { dim: "event", from: query.from, to: query.to, measure: "quarantined", view: "all" }),
     ]).then(function (res) {
       var rows = res[0].totals.map(function (t) { return ["rejected: " + t.reason, fmt(t.n)]; });
-      var q = res[1].totals.reduce(function (s, t) { return s + t.n; }, 0);
-      rows.push(["quarantined events (excluded from other panels)", fmt(q)]);
+      rows.push(["quarantined events (excluded from other panels)", fmt(sum(res[1].totals))]);
       section.appendChild(table(["Counter", "Count"], rows, 1));
-      section.appendChild(el("p", "Quarantined shows only when the total reaches 5 per event type.", "note"));
+      section.appendChild(el("div", "Quarantined shows only when the total reaches 5 per event type.", "privacy"));
     });
   }
 
@@ -192,19 +252,84 @@
     else done = get("/v1/stats", Object.assign({ dim: section.dataset.dim }, q)).then(function (d) {
       (kind === "series" ? renderSeries : renderShare)(section, d);
     });
-    return done.catch(function (err) { section.appendChild(el("p", "Could not load: " + err.message, "note")); });
+    return done.catch(function (err) { section.appendChild(empty("Could not load", err.message, "error")); throw err; });
+  }
+
+  function kpi(name, value, foot) {
+    document.querySelector('[data-kpi="' + name + '"]').textContent = value;
+    if (foot) document.querySelector('[data-kpi-foot="' + name + '"]').textContent = foot;
+  }
+
+  function loadKpis(query) {
+    var base = { dim: "event", from: query.from, to: query.to, view: query.view };
+    var debounced = "debounced_" + interval.value;
+    var jobs = [
+      ["events", Object.assign({}, base, { measure: "raw" }), "Raw events · " + query.view + " view"],
+      ["configs", Object.assign({}, base, { measure: "debounced_1d" }), "Sum of daily distinct configs"],
+      ["debounced", Object.assign({}, base, { measure: debounced }), "Debounced " + interval.value + " · " + query.view + " view"],
+      ["quarantined", Object.assign({}, base, { measure: "quarantined", view: "all" }), "All views · excluded from usage panels"],
+    ];
+    return Promise.all(jobs.map(function (job) {
+      kpi(job[0], "—");
+      return get("/v1/stats", job[1]).then(function (d) {
+        if (d.totals.length || !d.suppressed_count) kpi(job[0], fmt(sum(d.totals)), job[2]);
+        else kpi(job[0], "Suppressed", "Below the n<5 threshold");
+      }, function (err) { kpi(job[0], "—", "Could not load"); throw err; });
+    }));
+  }
+
+  function settle(promises) {
+    return Promise.all(promises.map(function (p) { return p.then(function () { return true; }, function () { return false; }); }));
   }
 
   function refresh() {
     var query = params();
-    if (!query.from || !query.to || query.from > query.to) { status.textContent = "Pick a valid date range."; return; }
-    status.textContent = "Loading...";
-    charts.forEach(function (c) { c.destroy(); });
+    interval.disabled = form.elements.measure.value !== "debounced";
+    if (!query.from || !query.to || query.from > query.to) { setStatus("Pick a valid date range.", "error"); rangeLabel.textContent = ""; return; }
+    rangeLabel.textContent = "Selected range · " + day(query.from) + " – " + day(query.to);
+    setStatus("Loading...");
+    charts.forEach(function (c) { c.plot.destroy(); });
     charts = [];
-    Promise.all(Array.prototype.map.call(document.querySelectorAll("#panels section"), function (s) { return load(s, query); }))
-      .then(function () { status.textContent = "Range " + query.from + " to " + query.to + ", measure " + query.measure + ", view " + query.view + "."; });
+    var run = ++generation;
+    var jobs = [loadKpis(query)].concat(Array.prototype.map.call(document.querySelectorAll("#panels section"), function (s) { return load(s, query); }));
+    settle(jobs).then(function (ok) {
+      if (run !== generation) return;
+      var failed = ok.filter(function (x) { return !x; }).length;
+      var summary = query.measure.replace("_", " ") + " · " + query.view;
+      if (failed) setStatus(failed + " panel(s) failed · " + summary, "error");
+      else setStatus("Live · " + summary, "ok");
+    });
   }
 
+  function redraw() {
+    charts.forEach(function (c) { c.plot.destroy(); plot(c); });
+  }
+
+  function storedTheme() {
+    try { return localStorage.getItem(THEME_KEY); } catch (e) { return null; }
+  }
+  function applyTheme(theme) {
+    if (theme === "light" || theme === "dark") root.dataset.theme = theme;
+    else delete root.dataset.theme;
+  }
+  document.getElementById("themeButton").addEventListener("click", function () {
+    var current = root.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    var next = current === "dark" ? "light" : "dark";
+    applyTheme(next);
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* per-viewer convenience only */ }
+    redraw();
+  });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { if (!root.dataset.theme) redraw(); });
+
+  var resizeTimer;
+  window.addEventListener("resize", function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      charts.forEach(function (c) { c.plot.setSize({ width: Math.max(260, c.holder.clientWidth), height: 240 }); });
+    }, 150);
+  });
+
+  applyTheme(storedTheme());
   var today = new Date();
   form.elements.to.value = iso(today);
   form.elements.from.value = iso(new Date(today.getTime() - 89 * 86400000));
