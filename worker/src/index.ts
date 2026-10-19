@@ -330,13 +330,20 @@ export default {
     }
     return ingest(request, env);
   },
-  /** Daily cron (0 2 * * *): roll up day D-1 (UTC) into D1, alert on zero config events. */
+  /** Daily cron (0 2 * * *): roll up day D-1 (UTC) into D1, alert on failure or zero config events. */
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     if (!serves(env, "ingest")) {
       return;
     }
     const day = previousDay(controller.scheduledTime);
-    const configEvents = await rollupDay(env, day);
+    let configEvents: number;
+    try {
+      configEvents = await rollupDay(env, day);
+    } catch (error) {
+      // The message stays generic: no SQL, row or payload text leaves the Worker.
+      await sendAlert(env, `gqlmd telemetry: rollup of ${day} (UTC) failed`);
+      throw error;
+    }
     if (configEvents === 0) {
       await sendAlert(env, `gqlmd telemetry: no config events on ${day} (UTC)`);
     }
