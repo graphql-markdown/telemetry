@@ -4,7 +4,7 @@
 
   var SETTINGS = ["diffMethod", "force", "hierarchy", "mdxParser", "pretty", "telemetry"];
   var PALETTE = ["#2f6fed", "#e8590c", "#2f9e44", "#ae3ec9", "#f08c00", "#1098ad", "#c2255c", "#868e96"];
-  var LABELS = { ci: { "0": "local", "1": "CI" } };
+  var LABELS = { ci: { "0": "local", "1": "CI" }, formatter: { "": "not set" } };
 
   var form = document.getElementById("controls");
   var status = document.getElementById("status");

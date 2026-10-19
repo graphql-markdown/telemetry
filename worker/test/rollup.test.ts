@@ -319,6 +319,16 @@ describe("rollupDay", () => {
     }
   });
 
+  it("counts formatters on config events only", async () => {
+    mockAe(base);
+    await rollupDay(makeEnv(), DAY);
+    const formatter = sqls.filter((sql) => /SELECT blob6 AS value/.test(sql));
+    expect(formatter).toHaveLength(2);
+    for (const sql of formatter) {
+      expect(sql).toContain("blob1 = 'config'");
+    }
+  });
+
   it("never puts a tuple in count(DISTINCT ...), which the AE SQL API rejects", async () => {
     mockAe(base);
     await rollupDay(makeEnv(), DAY);
