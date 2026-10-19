@@ -12,7 +12,6 @@
   var status = document.getElementById("status");
   var statusDot = document.getElementById("statusDot");
   var rangeLabel = document.getElementById("rangeLabel");
-  var interval = document.getElementById("interval");
   var charts = [];
   var generation = 0;
 
@@ -36,8 +35,10 @@
 
   function params() {
     var kind = form.elements.measure.value;
-    var measure = kind === "events" ? "raw" : kind === "configs" ? "debounced_1d" : kind === "colo_sampled" ? "colo_sampled" : "debounced_" + interval.value;
-    return { from: form.elements.from.value, to: form.elements.to.value, measure: measure, view: form.elements.view.value };
+    var measure = kind === "events" ? "raw" : kind === "configs" ? "debounced_1d" : kind === "colo_sampled" ? "colo_sampled" : "debounced_1d";
+    var to = new Date();
+    var from = new Date(to.getTime() - (Number(form.elements.range.value) - 1) * 86400000);
+    return { from: iso(from), to: iso(to), measure: measure, view: form.elements.view.value };
   }
 
   function get(path, query) {
@@ -262,11 +263,10 @@
 
   function loadKpis(query) {
     var base = { dim: "event", from: query.from, to: query.to, view: query.view };
-    var debounced = "debounced_" + interval.value;
     var jobs = [
       ["events", Object.assign({}, base, { measure: "raw" }), "Raw events · " + query.view + " view"],
       ["configs", Object.assign({}, base, { measure: "debounced_1d" }), "Sum of daily distinct configs"],
-      ["debounced", Object.assign({}, base, { measure: debounced }), "Debounced " + interval.value + " · " + query.view + " view"],
+      ["debounced", Object.assign({}, base, { measure: "debounced_1d" }), "Debounced 1d · " + query.view + " view"],
       ["quarantined", Object.assign({}, base, { measure: "quarantined", view: "all" }), "All views · excluded from usage panels"],
     ];
     return Promise.all(jobs.map(function (job) {
@@ -284,8 +284,6 @@
 
   function refresh() {
     var query = params();
-    interval.disabled = form.elements.measure.value !== "debounced";
-    if (!query.from || !query.to || query.from > query.to) { setStatus("Pick a valid date range.", "error"); rangeLabel.textContent = ""; return; }
     rangeLabel.textContent = "Selected range · " + day(query.from) + " – " + day(query.to);
     setStatus("Loading...");
     charts.forEach(function (c) { c.plot.destroy(); });
@@ -330,9 +328,6 @@
   });
 
   applyTheme(storedTheme());
-  var today = new Date();
-  form.elements.to.value = iso(today);
-  form.elements.from.value = iso(new Date(today.getTime() - 89 * 86400000));
   form.addEventListener("change", refresh);
   form.addEventListener("submit", function (e) { e.preventDefault(); refresh(); });
   refresh();

@@ -34,7 +34,7 @@ describe("dashboard assets", () => {
   });
 
   it("has the toggles, range picker and every panel", () => {
-    for (const needle of ['id="from"', 'id="to"', 'value="events"', 'value="debounced"', 'value="configs"', 'value="colo_sampled"', 'value="local"', 'value="ci"', 'value="all"']) {
+    for (const needle of ['name="range"', 'value="365"', 'value="events"', 'value="debounced"', 'value="configs"', 'value="colo_sampled"', 'value="local"', 'value="ci"', 'value="all"']) {
       expect(html).toContain(needle);
     }
     for (const panel of ["versions", "ci", "provider", "formatter", "graphql", "loader", "create", "targets", "settings", "catalog", "generate", "health"]) {
@@ -46,8 +46,10 @@ describe("dashboard assets", () => {
     expect(html).toContain('name="color-scheme" content="light dark"');
   });
 
-  it("renders data without innerHTML and defaults to the local view", () => {
+  it("renders data without innerHTML and defaults to the all view", () => {
     expect(app).not.toContain("innerHTML");
-    expect(html).toMatch(/value="local" checked/);
+    expect(html).toMatch(/value="all" checked/);
+    expect(html).not.toContain('id="interval"');
+    expect(html).not.toContain('type="date"');
   });
 });

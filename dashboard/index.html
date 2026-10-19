@@ -34,8 +34,15 @@
     </div>
 
     <form class="filters" id="controls" aria-label="Filters">
-      <div class="field"><label for="from">From</label><input type="date" id="from" required></div>
-      <div class="field"><label for="to">To</label><input type="date" id="to" required></div>
+      <fieldset class="field">
+        <legend class="group-label">Range</legend>
+        <div class="segmented">
+          <label><input type="radio" name="range" value="30"> 1 month</label>
+          <label><input type="radio" name="range" value="90" checked> 3 months</label>
+          <label><input type="radio" name="range" value="180"> 6 months</label>
+          <label><input type="radio" name="range" value="365"> 1 year</label>
+        </div>
+      </fieldset>
       <fieldset class="field">
         <legend class="group-label">Measure</legend>
         <div class="segmented">
@@ -45,19 +52,12 @@
           <label><input type="radio" name="measure" value="colo_sampled"> Colo sampled</label>
         </div>
       </fieldset>
-      <div class="field">
-        <label for="interval">Debounce interval</label>
-        <select id="interval">
-          <option value="1h">1 hour</option>
-          <option value="1d">1 day</option>
-        </select>
-      </div>
       <fieldset class="field">
         <legend class="group-label">View</legend>
         <div class="segmented">
-          <label><input type="radio" name="view" value="local" checked> Local</label>
+          <label><input type="radio" name="view" value="local"> Local</label>
           <label><input type="radio" name="view" value="ci"> CI</label>
-          <label><input type="radio" name="view" value="all"> All</label>
+          <label><input type="radio" name="view" value="all" checked> All</label>
         </div>
       </fieldset>
       <div class="filter-spacer"></div>
