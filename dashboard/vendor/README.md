@@ -1,6 +1,6 @@
 # Vendored dependencies
 
-Self-hosted so the dashboard can run under a strict CSP (`script-src 'self'`, `style-src 'self'`) with no third-party requests. Subresource Integrity is unnecessary because the files are served from the same origin.
+Self-hosted so the dashboard can run under a strict CSP (`script-src 'self'`, `style-src 'self'`) with no third-party scripts. The only external requests are the Jost and Victor Mono web fonts (Google Fonts), which the CSP allows via `style-src https://fonts.googleapis.com` and `font-src https://fonts.gstatic.com`. Subresource Integrity is unnecessary because the files are served from the same origin.
 
 | File | Package | Version | Source URL | SHA-256 |
 | --- | --- | --- | --- | --- |

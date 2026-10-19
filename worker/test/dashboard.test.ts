@@ -6,11 +6,12 @@ import publicHtml from "../../public/public.html?raw";
 import vendorReadme from "../../dashboard/vendor/README.md?raw";
 
 describe("dashboard assets", () => {
-  it("self-hosts uPlot at a pinned version, with no external URLs", () => {
+  it("self-hosts uPlot at a pinned version, with no external URLs but Google Fonts", () => {
     expect(vendorReadme).toContain("1.6.31");
     expect(html).toContain('src="vendor/uPlot.iife.min.js"');
     expect(html).toContain('href="vendor/uPlot.min.css"');
-    for (const page of [html, publicHtml, app]) {
+    const fonts = /https:\/\/fonts\.(googleapis|gstatic)\.com[/"]/g;
+    for (const page of [html.replace(fonts, ""), publicHtml, app]) {
       expect(page).not.toMatch(/https?:\/\//);
     }
   });
