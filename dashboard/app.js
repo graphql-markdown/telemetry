@@ -112,7 +112,11 @@
         var color = cssVar(seriesVar(i));
         return { label: label, stroke: color, width: 2, points: { size: 5, fill: color } };
       })),
-      axes: [axis, axis],
+      tzDate: function (ts) { return window.uPlot.tzDate(new Date(ts * 1000), "Etc/UTC"); },
+      axes: [
+        Object.assign({}, axis, { incrs: [86400, 172800, 604800], values: [[86400, "{M}/{D}", null, null, null, null, null, null, 1]] }),
+        axis,
+      ],
     }, chart.cols, chart.holder);
   }
 
