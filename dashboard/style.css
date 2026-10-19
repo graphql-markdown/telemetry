@@ -1,3 +1,19 @@
+/* Self-hosted variable fonts (see vendor/README.md); no third-party requests. */
+@font-face {
+  font-family: "Jost";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("vendor/jost-latin-wght-normal.woff2") format("woff2-variations");
+}
+@font-face {
+  font-family: "Victor Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 700;
+  src: url("vendor/victor-mono-latin-wght-normal.woff2") format("woff2-variations");
+}
+
 /* Palette from the GraphQL-Markdown website (graphql-markdown/website/src/css/custom.css). */
 :root {
   color-scheme: light dark;
