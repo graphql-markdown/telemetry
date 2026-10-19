@@ -6,11 +6,15 @@ export const MAX_ROWS_PER_DAY = 2000;
 
 const MEASURES = ["raw", "debounced_1h", "debounced_1d"] as const;
 
-/** Single-blob dimensions: dimension name and its blob column (see `buildBlobs`). */
-const BLOB_DIMS: ReadonlyArray<readonly [string, string]> = [
+/**
+ * Single-blob dimensions: dimension name, its blob column (see `buildBlobs`)
+ * and an optional event filter.
+ */
+const BLOB_DIMS: ReadonlyArray<readonly [string, string, string?]> = [
   ["event", "blob1"],
   ["pkgVersion", "blob5"],
-  ["formatter", "blob6"],
+  // Only config events carry a formatter; generate events would all count as "".
+  ["formatter", "blob6", " AND blob1 = 'config'"],
   ["os", "blob8"],
   ["pm", "blob9"],
   ["graphqlMajor", "blob11"],
@@ -201,15 +205,15 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
   const counts: Counts = new Map();
   let configEvents = 0;
 
-  for (const [dim, column] of BLOB_DIMS) {
-    for (const row of await query(env, dimSql(column, day))) {
+  for (const [dim, column, extra = ""] of BLOB_DIMS) {
+    for (const row of await query(env, dimSql(column, day, extra))) {
       const value = String(row.value);
       addMeasures(counts, dim, value, row);
       if (dim === "event" && value === "config") {
         configEvents += Number(row.raw ?? 0);
       }
     }
-    for (const row of await query(env, coloSql(column, day))) {
+    for (const row of await query(env, coloSql(column, day, extra))) {
       addColo(counts, dim, String(row.value), row);
       if (dim === "event" && String(row.value) === "config") {
         configEvents += Number(row.colo_sampled ?? 0);

@@ -363,6 +363,13 @@ describe("validate: closed sets for free-text channels", () => {
     expect(res).toMatchObject({ ok: true });
   });
 
+  it("keeps the Docusaurus plugin default formatter", () => {
+    expect(validate(withConfig({ formatter: "@graphql-markdown/docusaurus/mdx" }))).toMatchObject({
+      ok: true,
+      value: { config: { formatter: "@graphql-markdown/docusaurus/mdx" } },
+    });
+  });
+
   it("maps unlisted @graphql-markdown strings to unknown-value", () => {
     expect(validate(withConfig({ formatter: "@graphql-markdown/acme-secret" }))).toMatchObject({
       ok: true,

@@ -196,6 +196,8 @@ const PACKAGE_NAMES: ReadonlySet<string> = new Set([
     "telemetry",
   ].map((name) => `@graphql-markdown/${name}`),
   "create-graphql-markdown-docs",
+  // Default formatter of the Docusaurus plugin (packages/docusaurus/src/index.ts).
+  "@graphql-markdown/docusaurus/mdx",
   ...FORMATTER_PRESETS.map((name) => `@graphql-markdown/formatters/${name}`),
 ]);
 const PRE_TAGS = "alpha|beta|rc|canary|next";
