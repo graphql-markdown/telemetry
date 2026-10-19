@@ -319,6 +319,14 @@ describe("rollupDay", () => {
     }
   });
 
+  it("never puts a tuple in count(DISTINCT ...), which the AE SQL API rejects", async () => {
+    mockAe(base);
+    await rollupDay(makeEnv(), DAY);
+    for (const sql of sqls) {
+      expect(sql).not.toMatch(/count\(DISTINCT \(/i);
+    }
+  });
+
   it("throws when the SQL API fails", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 500 }));
     await expect(rollupDay(makeEnv(), DAY)).rejects.toThrow("500");
@@ -342,8 +350,10 @@ describe("generate rollup", () => {
     const sql = sqls.find((q) => q.includes("AS pages_p50")) ?? "";
     expect(sql).toContain("blob1 = 'generate'");
     expect(sql).toContain("blob17 = '0'");
-    expect(sql).toContain("quantileWeighted(0.95)(double3, _sample_interval * double1)");
-    expect(sql).toContain("quantileWeighted(0.5)(double2, _sample_interval * double1)");
+    // The AE SQL API rejects a Float64 weight in the weighted quantiles.
+    expect(sql).toContain("quantileExactWeighted(0.95)(double3, toUInt32(_sample_interval * double1))");
+    expect(sql).toContain("quantileExactWeighted(0.5)(double2, toUInt32(_sample_interval * double1))");
+    expect(sql).toContain("sumIf(_sample_interval * double1, blob20 != '')");
     const errors = sqls.find((q) => q.includes("AS error_type")) ?? "";
     expect(errors).toContain("blob20 != ''");
     expect(errors).toContain("blob17 = '0'");
@@ -415,6 +425,18 @@ describe("alert", () => {
     mockAe({});
     await run(undefined);
     expect(hookCalls()).toHaveLength(0);
+  });
+
+  it("fires and rethrows when the rollup fails", async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/analytics_engine/sql")) return new Response(null, { status: 422 });
+      return new Response(null, { status: 204 });
+    });
+    await expect(run("https://hooks.test/x")).rejects.toThrow("422");
+    const calls = hookCalls();
+    expect(calls).toHaveLength(1);
+    const body = JSON.parse(String((calls[0][1] as RequestInit).body));
+    expect(body.content).toBe("gqlmd telemetry: rollup of 2026-10-10 (UTC) failed");
   });
 
   it("survives a failing webhook", async () => {

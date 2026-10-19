@@ -45,15 +45,19 @@ const dayWindow = (day: string): string => {
 /** Not quarantined (blob17 is the quarantined flag). */
 const CLEAN = "blob17 = '0'";
 
-const MEASURE_COLUMNS =
-  "SUM(_sample_interval * double1) AS raw, " +
-  "count(DISTINCT (blob2, toStartOfHour(timestamp))) AS debounced_1h, " +
-  "count(DISTINCT blob2) AS debounced_1d";
+/** Integer event weight: the AE weighted quantiles reject a Float64 weight. */
+const WEIGHT = "toUInt32(_sample_interval * double1)";
 
+/**
+ * The AE SQL API rejects a tuple in count(DISTINCT ...), so the 1 h debounce
+ * groups by (fp, hour) in a subquery and counts its rows.
+ */
 const dimSql = (column: string, day: string, extra = ""): string => {
   return (
-    `SELECT ${column} AS value, blob12 AS ci, ${MEASURE_COLUMNS} FROM gqlmd_events ` +
-    `WHERE ${dayWindow(day)} AND ${CLEAN}${extra} GROUP BY value, ci`
+    `SELECT value, ci, SUM(raw) AS raw, count() AS debounced_1h, count(DISTINCT fp) AS debounced_1d FROM (` +
+    `SELECT ${column} AS value, blob12 AS ci, blob2 AS fp, toStartOfHour(timestamp) AS hour, ` +
+    `SUM(_sample_interval * double1) AS raw FROM gqlmd_events ` +
+    `WHERE ${dayWindow(day)} AND ${CLEAN}${extra} GROUP BY value, ci, fp, hour) GROUP BY value, ci`
   );
 };
 
@@ -77,11 +81,12 @@ const quarantinedSql = (day: string): string => {
 
 const catalogSql = (day: string): string => {
   return (
+    `SELECT fp_shape, ci, version, config, SUM(events) AS events, count() AS debounced FROM (` +
     `SELECT blob3 AS fp_shape, blob12 AS ci, blob5 AS version, blob18 AS config, ` +
-    `SUM(_sample_interval * double1) AS events, ` +
-    `count(DISTINCT (blob2, toStartOfHour(timestamp))) AS debounced ` +
+    `blob2 AS fp, toStartOfHour(timestamp) AS hour, SUM(_sample_interval * double1) AS events ` +
     `FROM gqlmd_events WHERE ${dayWindow(day)} AND ${CLEAN} ` +
-    `AND blob1 = 'config' GROUP BY fp_shape, ci, version, config`
+    `AND blob1 = 'config' GROUP BY fp_shape, ci, version, config, fp, hour) ` +
+    `GROUP BY fp_shape, ci, version, config`
   );
 };
 
@@ -90,11 +95,11 @@ const generateSql = (day: string): string => {
   return (
     `SELECT blob5 AS version, blob14 AS trigger, blob12 AS ci, ` +
     `SUM(_sample_interval * double1) AS runs, ` +
-    `SUMIf(_sample_interval * double1, blob20 != '') AS failures, ` +
-    `quantileWeighted(0.5)(double2, _sample_interval * double1) AS pages_p50, ` +
-    `quantileWeighted(0.95)(double2, _sample_interval * double1) AS pages_p95, ` +
-    `quantileWeighted(0.5)(double3, _sample_interval * double1) AS duration_p50, ` +
-    `quantileWeighted(0.95)(double3, _sample_interval * double1) AS duration_p95 ` +
+    `sumIf(_sample_interval * double1, blob20 != '') AS failures, ` +
+    `quantileExactWeighted(0.5)(double2, ${WEIGHT}) AS pages_p50, ` +
+    `quantileExactWeighted(0.95)(double2, ${WEIGHT}) AS pages_p95, ` +
+    `quantileExactWeighted(0.5)(double3, ${WEIGHT}) AS duration_p50, ` +
+    `quantileExactWeighted(0.95)(double3, ${WEIGHT}) AS duration_p95 ` +
     `FROM gqlmd_events WHERE ${dayWindow(day)} AND ${CLEAN} AND blob1 = 'generate' ` +
     `GROUP BY version, trigger, ci`
   );
