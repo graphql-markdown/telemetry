@@ -27,12 +27,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code Base
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        uses: oven-sh/setup-bun@v2.2.0
 
       - name: Install modules
         run: bun install --frozen-lockfile
@@ -43,19 +43,37 @@ jobs:
       - name: Run Tests
         run: bun run test
 
+  # Fails when a `uses:` reference is missing from .github/workflows/actions.lock
+  # or a locked commit no longer matches its ref. Fix locally with `gh actions-lock`.
+  actions-lock:
+    name: Actions lockfile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code Base
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify lockfile
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh extension install github/gh-actions-lock --pin v0.2.0
+          gh actions-lock --verify --no-interactive
+
   opentofu:
     name: OpenTofu
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code Base
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
       # worker.tofu reads the bundled Worker with file(),
       # so the bundle (worker/dist/index.js) must exist before `tofu validate`.
       - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        uses: oven-sh/setup-bun@v2.2.0
 
       - name: Build Worker bundle
         run: |
@@ -63,7 +81,7 @@ jobs:
           bun run build
 
       - name: Setup OpenTofu
-        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        uses: opentofu/setup-opentofu@v2.0.2
         with:
           tofu_version_file: .opentofu-version
 
@@ -87,10 +105,11 @@ jobs:
   # Manual only (workflow_dispatch on main). The plan is printed to the job
   # summary and the apply uses that saved plan, nothing re-planned.
   # Required reviewers on the `production` environment add an approval before the job starts.
+  # Actions stay SHA-pinned here (not only via actions.lock) since this job holds the secrets.
   deploy:
     name: Deploy
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-    needs: [worker, opentofu]
+    needs: [worker, actions-lock, opentofu]
     runs-on: ubuntu-latest
     environment: production
     concurrency:

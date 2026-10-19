@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # Bumps also regenerate the matching .github/workflows/actions.lock entries.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "⬆️ chore(ci)"
+    groups:
+      actions:
+        patterns: ["*"]
