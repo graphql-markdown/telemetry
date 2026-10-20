@@ -2,7 +2,6 @@
 # Arg:   $min, a value whose range total is below $min is suppressed (counted, never listed).
 # Output: dashboard-shaped public stats JSON (version 2), every key always present.
 (.[0].results // []) as $rows
-| ["0"] as $local
 | ["1"] as $ci
 | ["0", "1"] as $all
 # One panel: rows of dim+measure in the given ci views (optionally only the listed values),
@@ -38,23 +37,23 @@
     to: (now | strftime("%Y-%m-%d")),
     min_count: $min,
     kpis: {
-      events: panel("event"; "raw"; $local; null),
-      configs: panel("event"; "debounced_1d"; $local; null),
-      debounced: panel("event"; "debounced_1d"; $local; null)
+      events: panel("event"; "raw"; $all; null),
+      configs: panel("event"; "debounced_1d"; $all; null),
+      debounced: panel("event"; "debounced_1d"; $all; null)
     },
     panels: {
-      versions: panel("pkgVersion"; "raw"; $local; null),
+      versions: panel("pkgVersion"; "raw"; $all; null),
       ci: panel("ci"; "raw"; $all; null),
       provider: panel("ciProvider"; "raw"; $ci; null),
-      formatter: panel("formatter"; "raw"; $local; null),
-      graphql: panel("graphqlMajor"; "raw"; $local; null),
-      loader: panel("loader.kind"; "raw"; $local; null),
-      create: panel("event"; "raw"; $local; ["create_scaffold", "create_wire"]),
-      targets: panel("target"; "raw"; $local; null)
+      formatter: panel("formatter"; "raw"; $all; null),
+      graphql: panel("graphqlMajor"; "raw"; $all; null),
+      loader: panel("loader.kind"; "raw"; $all; null),
+      create: panel("event"; "raw"; $all; ["create_scaffold", "create_wire"]),
+      targets: panel("target"; "raw"; $all; null)
     },
     settings: [
       ["diffMethod", "force", "hierarchy", "mdxParser", "pretty", "telemetry"][] as $k
-      | panel("setting." + $k; "raw"; $local; null) as $p
+      | panel("setting." + $k; "raw"; $all; null) as $p
       | {key: $k, totals: $p.totals, suppressed_count: $p.suppressed_count}
     ]
   }

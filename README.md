@@ -82,7 +82,7 @@ cd infra/bootstrap && tofu init -backend=false && tofu test
 
 ## Public statistics page
 
-The public page is a static site on GitHub Pages at https://telemetry.graphql-markdown.dev. No Worker serves it. It is a read-only copy of the dashboard panels (KPI tiles, time-series charts, share bars, data tables, light/dark theme) with no filters and a fixed last-90-days range. `.github/workflows/public-stats.yml` runs daily and calls `scripts/build-public.sh`, which assembles the page from `public/`, shares `style.css`, the logo, favicon and `vendor/` assets with `dashboard/`, and exports suppressed aggregates (n < 5 hidden) from D1 into `stats.json` through `scripts/export-public.sh`. The result is published to the `gh-pages` branch. The CI-vs-local and CI-provider panels include aggregated CI counts; all other panels cover local runs only.
+The public page is a static site on GitHub Pages at https://telemetry.graphql-markdown.dev. No Worker serves it. It is a read-only copy of the dashboard panels (KPI tiles, time-series charts, share bars, data tables, light/dark theme) with no filters and a fixed last-90-days range. `.github/workflows/public-stats.yml` runs daily and calls `scripts/build-public.sh`, which assembles the page from `public/`, shares `style.css`, the logo, favicon and `vendor/` assets with `dashboard/`, and exports suppressed aggregates (n < 5 hidden) from D1 into `stats.json` through `scripts/export-public.sh`. The result is published to the `gh-pages` branch. It shows the All view (local + CI runs together), like the dashboard default; the CI-vs-local and CI-provider panels split them.
 
 One-time steps:
 

@@ -13,12 +13,6 @@ const js = read("public/public.js");
 const PANELS = ["versions", "ci", "provider", "formatter", "graphql", "loader", "create", "targets", "settings"];
 
 describe("public page static checks", () => {
-  it("labels the KPI tiles like the dashboard (measure and view)", () => {
-    expect(html).toContain('data-kpi-foot="events">Raw events · local view<');
-    expect(html).toContain('data-kpi-foot="configs">Sum of daily distinct configs<');
-    expect(html).toContain('data-kpi-foot="debounced">Debounced 1d · local view<');
-  });
-
   it("has CSP meta, no inline script/style, no absolute URLs", () => {
     expect(html).toContain(
       `content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'"`,
@@ -68,6 +62,15 @@ describe("public page static checks", () => {
   it("states that n<5 suppression applies to the 90-day total, not to each day", () => {
     expect(html).toContain("The rule applies to the 90-day total of each value");
     expect(html).toContain("not suppressed individually");
+  });
+
+  it("states that the page shows the all view", () => {
+    const foot = (k: string) => new RegExp(`data-kpi-foot="${k}">([^<]*)<`).exec(html)![1];
+    expect(foot("events")).toBe("Raw events · all view");
+    expect(foot("configs")).toBe("Sum of daily distinct configs");
+    expect(foot("debounced")).toBe("Debounced 1d · all view");
+    expect(html).toContain("Local and CI runs are counted together; the CI vs local chart and the CI provider panel split them.");
+    expect(html).not.toContain("every other figure covers local runs");
   });
 
   it("CNAME is exact and _headers is absent", () => {
