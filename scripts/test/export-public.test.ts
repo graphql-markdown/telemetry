@@ -5,9 +5,12 @@ import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const SCRIPT = resolve(__dirname, "../export-public.sh");
-const DIMS = ["formatter", "graphqlMajor", "loader.kind", "pkgVersion"];
+const APP_JS = resolve(__dirname, "../../dashboard/app.js");
+const SETTING_KEYS = ["diffMethod", "force", "hierarchy", "mdxParser", "pretty", "telemetry"];
+const PANELS = ["versions", "ci", "provider", "formatter", "graphql", "loader", "create", "targets"];
+const EMPTY = { series: [], totals: [], suppressed_count: 0 };
 
-type Row = { dim: string; value: string; n: number };
+type Row = { day: string; ci: string; dim: string; measure: string; value: string; n: number };
 
 let dir: string;
 beforeEach(() => {
@@ -29,57 +32,117 @@ function run(input: string) {
 }
 
 const runRows = (rows: Row[]) => run(JSON.stringify([{ results: rows, success: true }]));
+const row = (dim: string, value: string, n: number, o: Partial<Row> = {}): Row => ({
+  day: "2026-01-01",
+  ci: "0",
+  measure: "raw",
+  dim,
+  value,
+  n,
+  ...o,
+});
 
 describe("export-public.sh", () => {
-  it("keeps n=5 and hides n=4, counting suppressed", () => {
+  it("suppresses by range total, not the daily value", () => {
     const { json } = runRows([
-      { dim: "formatter", value: "keep", n: 5 },
-      { dim: "formatter", value: "hide", n: 4 },
+      row("formatter", "v", 3, { day: "2026-01-01" }),
+      row("formatter", "v", 3, { day: "2026-01-02" }),
     ]);
-    expect(json.dims.formatter.totals).toEqual([{ value: "keep", n: 5 }]);
-    expect(json.dims.formatter.suppressed_count).toBe(1);
+    expect(json.panels.formatter.totals).toEqual([{ value: "v", n: 6 }]);
+    expect(json.panels.formatter.series).toEqual([
+      { day: "2026-01-01", value: "v", n: 3 },
+      { day: "2026-01-02", value: "v", n: 3 },
+    ]);
+    expect(json.panels.formatter.suppressed_count).toBe(0);
   });
 
-  it("sorts totals by n descending", () => {
-    const { json } = runRows([
-      { dim: "pkgVersion", value: "a", n: 7 },
-      { dim: "pkgVersion", value: "b", n: 100 },
-      { dim: "pkgVersion", value: "c", n: 20 },
-    ]);
-    expect(json.dims.pkgVersion.totals.map((t: Row) => t.value)).toEqual(["b", "c", "a"]);
+  it("keeps n=5, hides n=4 and counts it", () => {
+    const { json } = runRows([row("formatter", "keep", 5), row("formatter", "hide", 4)]);
+    expect(json.panels.formatter.totals).toEqual([{ value: "keep", n: 5 }]);
+    expect(json.panels.formatter.suppressed_count).toBe(1);
   });
 
-  it("always has all four dims, empty when no rows", () => {
-    const { json } = runRows([{ dim: "formatter", value: "x", n: 9 }]);
-    expect(Object.keys(json.dims).sort()).toEqual([...DIMS].sort());
-    for (const d of DIMS.filter((d) => d !== "formatter")) {
-      expect(json.dims[d]).toEqual({ totals: [], suppressed_count: 0 });
+  it("removes suppressed values from the series", () => {
+    const { json } = runRows([row("formatter", "keep", 9), row("formatter", "hide", 2)]);
+    expect(json.panels.formatter.series.map((s: Row) => s.value)).toEqual(["keep"]);
+    expect(JSON.stringify(json.panels.formatter)).not.toContain("hide");
+  });
+
+  it("local panels ignore ci=1, provider ignores ci=0, ci panel has both", () => {
+    const { json } = runRows([
+      row("formatter", "loc", 10, { ci: "0" }),
+      row("formatter", "ci", 10, { ci: "1" }),
+      row("ciProvider", "gha", 10, { ci: "1" }),
+      row("ciProvider", "nope", 10, { ci: "0" }),
+      row("ci", "0", 7, { ci: "0" }),
+      row("ci", "1", 8, { ci: "1" }),
+    ]);
+    expect(json.panels.formatter.totals).toEqual([{ value: "loc", n: 10 }]);
+    expect(json.panels.provider.totals).toEqual([{ value: "gha", n: 10 }]);
+    expect(json.panels.ci.totals).toEqual([
+      { value: "1", n: 8 },
+      { value: "0", n: 7 },
+    ]);
+  });
+
+  it("separates raw and debounced_1d event kpis", () => {
+    const { json } = runRows([
+      row("event", "run", 11, { measure: "raw" }),
+      row("event", "run", 6, { measure: "debounced_1d" }),
+    ]);
+    expect(json.kpis.events.totals).toEqual([{ value: "run", n: 11 }]);
+    expect(json.kpis.configs.totals).toEqual([{ value: "run", n: 6 }]);
+    expect(json.kpis.debounced).toEqual(json.kpis.configs);
+  });
+
+  it("create panel only has create_scaffold and create_wire", () => {
+    const { json } = runRows([
+      row("event", "create_scaffold", 6),
+      row("event", "create_wire", 7),
+      row("event", "run", 50),
+    ]);
+    expect(json.panels.create.totals).toEqual([
+      { value: "create_wire", n: 7 },
+      { value: "create_scaffold", n: 6 },
+    ]);
+    expect(JSON.stringify(json.panels.create)).not.toContain("run");
+    expect(json.panels.create.suppressed_count).toBe(0);
+  });
+
+  it("settings has all six keys in order, empty when absent", () => {
+    const { json } = runRows([row("setting.force", "true", 9)]);
+    expect(json.settings.map((s: { key: string }) => s.key)).toEqual(SETTING_KEYS);
+    for (const s of json.settings) {
+      if (s.key === "force") expect(s.totals).toEqual([{ value: "true", n: 9 }]);
+      else expect(s).toEqual({ key: s.key, totals: [], suppressed_count: 0 });
+      expect(s.series).toBeUndefined();
     }
   });
 
-  it("ignores dims outside the list", () => {
+  it("sorts totals by n descending and series by day then value", () => {
     const { json } = runRows([
-      { dim: "secret", value: "x", n: 50 },
-      { dim: "formatter", value: "y", n: 50 },
+      row("pkgVersion", "a", 7, { day: "2026-01-02" }),
+      row("pkgVersion", "b", 100, { day: "2026-01-02" }),
+      row("pkgVersion", "c", 20, { day: "2026-01-01" }),
+      row("pkgVersion", "b", 1, { day: "2026-01-01" }),
     ]);
-    expect(Object.keys(json.dims).sort()).toEqual([...DIMS].sort());
-    expect(JSON.stringify(json)).not.toContain("secret");
+    expect(json.panels.versions.totals.map((t: Row) => t.value)).toEqual(["b", "c", "a"]);
+    expect(json.panels.versions.series.map((s: Row) => `${s.day}/${s.value}`)).toEqual([
+      "2026-01-01/b",
+      "2026-01-01/c",
+      "2026-01-02/a",
+      "2026-01-02/b",
+    ]);
   });
 
-  it("emits min_count, 90-day range and ISO generated", () => {
-    const { json } = runRows([]);
-    expect(json.min_count).toBe(5);
-    expect(json.from).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(json.to).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(json.generated).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
-    const days = (Date.parse(json.to) - Date.parse(json.from)) / 86400000;
-    expect(days).toBe(89);
-  });
-
-  it("empty results yields four empty dims and exit 0", () => {
+  it("empty results yields the full structure and exit 0", () => {
     const { res, json } = runRows([]);
     expect(res.status).toBe(0);
-    for (const d of DIMS) expect(json.dims[d]).toEqual({ totals: [], suppressed_count: 0 });
+    expect(Object.keys(json.kpis)).toEqual(["events", "configs", "debounced"]);
+    for (const k of Object.keys(json.kpis)) expect(json.kpis[k]).toEqual(EMPTY);
+    expect(Object.keys(json.panels)).toEqual(PANELS);
+    for (const p of PANELS) expect(json.panels[p]).toEqual(EMPTY);
+    expect(json.settings).toHaveLength(6);
   });
 
   it("fails on malformed input and leaves no output file", () => {
@@ -88,11 +151,35 @@ describe("export-public.sh", () => {
     expect(existsSync(out)).toBe(false);
   });
 
+  it("emits version 2, min_count, 90-day range and ISO generated", () => {
+    const { json } = runRows([]);
+    expect(json.version).toBe(2);
+    expect(json.min_count).toBe(5);
+    expect(json.from).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(json.to).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(json.generated).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    expect((Date.parse(json.to) - Date.parse(json.from)) / 86400000).toBe(89);
+  });
+
   it("preserves fractional n as given", () => {
-    const { json } = runRows([{ dim: "formatter", value: "f", n: 12.5 }]);
-    expect(json.dims.formatter.totals).toEqual([{ value: "f", n: 12.5 }]);
+    const { json } = runRows([row("formatter", "f", 12.5)]);
+    expect(json.panels.formatter.totals).toEqual([{ value: "f", n: 12.5 }]);
+    expect(json.panels.formatter.series[0].n).toBe(12.5);
+  });
+
+  it("drift: dashboard SETTINGS match the output and the SQL", () => {
+    const app = readFileSync(APP_JS, "utf8");
+    const m = /var SETTINGS = \[([^\]]*)\]/.exec(app);
+    expect(m).not.toBeNull();
+    const keys = [...m![1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
+    const { json } = runRows([]);
+    expect(json.settings.map((s: { key: string }) => s.key)).toEqual(keys);
+    const sh = readFileSync(SCRIPT, "utf8");
+    const sqlKeys = [...sh.matchAll(/'setting\.([^']+)'/g)].map((x) => x[1]);
+    expect(sqlKeys).toEqual(keys);
   });
 });
+
 
 describe("export-public.sh against the D1 API", () => {
   // Stub curl: logs each call, answers the database lookup and the query from fixtures,
@@ -103,7 +190,7 @@ describe("export-public.sh against the D1 API", () => {
     mkdirSync(bin);
     const lookup = JSON.stringify({ result: [{ name: "other", uuid: "wrong" }, { name: "gqlmd-telemetry", uuid: "db-123" }] });
     const query = JSON.stringify({
-      result: [{ results: [{ dim: "formatter", value: "a", n: 9 }, { dim: "formatter", value: "b", n: 2 }], success: true }],
+      result: [{ results: [{ day: "2026-01-01", ci: "0", measure: "raw", dim: "formatter", value: "a", n: 9 }, { day: "2026-01-01", ci: "0", measure: "raw", dim: "formatter", value: "b", n: 2 }], success: true }],
     });
     const body = opts.fail
       ? `printf '%s' '{"errors":[{"code":10000,"message":"Authentication error"}]}'; exit 22`
@@ -130,8 +217,8 @@ describe("export-public.sh against the D1 API", () => {
     expect(calls[1]).toContain("/accounts/acct/d1/database/db-123/query");
     expect(calls[1]).toContain("daily_counts");
     const json = JSON.parse(readFileSync(out, "utf8"));
-    expect(json.dims.formatter.totals).toEqual([{ value: "a", n: 9 }]);
-    expect(json.dims.formatter.suppressed_count).toBe(1);
+    expect(json.panels.formatter.totals).toEqual([{ value: "a", n: 9 }]);
+    expect(json.panels.formatter.suppressed_count).toBe(1);
   });
 
   it("prints the API error body and writes no output on failure", () => {

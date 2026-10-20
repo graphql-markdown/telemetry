@@ -6,11 +6,12 @@
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#485e58">
   <meta name="robots" content="noindex, nofollow, noarchive, noimageindex, noai, noimageai">
-  <title>GraphQL-Markdown public usage statistics</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'">
+  <title>GraphQL-Markdown · Usage statistics</title>
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'">
-  <link rel="stylesheet" href="public.css">
+  <link rel="stylesheet" href="vendor/uPlot.min.css">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="shell">
@@ -20,21 +21,66 @@
         <img class="logo" src="logo.svg" alt="" width="44" height="44">
         <div><div class="eyebrow">GraphQL-Markdown</div><h1>Usage statistics</h1></div>
       </div>
-      <button class="button" id="themeButton" type="button" aria-label="Toggle theme">◐&nbsp; Theme</button>
+      <div class="top-actions">
+        <span class="status-pill"><span class="dot" id="statusDot"></span><span id="status" role="status">Loading...</span></span>
+        <button class="button" id="themeButton" type="button" aria-label="Toggle theme">◐&nbsp; Theme</button>
+      </div>
     </div>
+
     <div class="hero">
-      <h2>Public usage overview</h2>
-      <p>Anonymous and aggregated. Raw events from local runs only (CI and quarantined events excluded). Last 90 days.</p>
+      <div>
+        <h2>Usage &amp; configuration</h2>
+        <p>Anonymous, aggregated adoption and configuration patterns across GraphQL-Markdown over the last 90 days.</p>
+      </div>
+      <div class="range-label" id="rangeLabel"></div>
     </div>
   </header>
+
   <main>
-    <div class="grid" id="out"></div>
-    <aside class="card note">
-      <p><small id="updated"></small></p>
-      <p><strong>n&lt;5 suppressed:</strong> values with fewer than 5 events in the range are hidden. Opt-out and blocked-network users are undercounted.</p>
-    </aside>
+    <div class="section-head">
+      <div><div class="section-kicker">At a glance</div><h3>Core activity</h3></div>
+      <span class="panel-tag">LAST 90 DAYS</span>
+    </div>
+    <div class="kpis" id="kpis">
+      <article class="kpi"><div class="kpi-top"><span>Events</span><span class="kpi-icon" aria-hidden="true">↗</span></div><div class="kpi-value" data-kpi="events">—</div><div class="kpi-foot" data-kpi-foot="events">Raw events · upper bound</div></article>
+      <article class="kpi"><div class="kpi-top"><span>Distinct configs</span><span class="kpi-icon" aria-hidden="true">⌘</span></div><div class="kpi-value" data-kpi="configs">—</div><div class="kpi-foot" data-kpi-foot="configs">Sum of daily distinct configs</div></article>
+      <article class="kpi"><div class="kpi-top"><span>Debounced activity</span><span class="kpi-icon" aria-hidden="true">◷</span></div><div class="kpi-value" data-kpi="debounced">—</div><div class="kpi-foot" data-kpi-foot="debounced">Debounced events</div></article>
+    </div>
+
+    <div class="section-head">
+      <div><div class="section-kicker">Trends &amp; breakdowns</div><h3>Usage patterns</h3></div>
+    </div>
+    <div class="grid" id="panels">
+      <section class="panel wide" data-panel="versions" data-title="Runs per day by version" data-sub="Daily activity split by package version" data-tag="TIME SERIES" data-dim="pkgVersion" data-kind="series"></section>
+      <section class="panel" data-panel="ci" data-title="CI vs local runs per day" data-sub="Runs per day by execution context" data-tag="TIME SERIES" data-dim="ci" data-kind="series" data-view="all" data-labels="ci"></section>
+      <section class="panel" data-panel="provider" data-title="CI provider share" data-sub="Distribution of detected CI providers" data-tag="BREAKDOWN" data-dim="ciProvider" data-kind="share" data-view="ci"></section>
+      <section class="panel" data-panel="formatter" data-title="Formatter share" data-sub="Custom formatters are masked as “custom”" data-tag="BREAKDOWN" data-dim="formatter" data-kind="share" data-labels="formatter"></section>
+      <section class="panel" data-panel="graphql" data-title="GraphQL major version" data-sub="Usage by GraphQL major version" data-tag="BREAKDOWN" data-dim="graphqlMajor" data-kind="share"></section>
+      <section class="panel" data-panel="loader" data-title="Loader kinds" data-sub="Custom loaders are masked as “custom”" data-tag="BREAKDOWN" data-dim="loader.kind" data-kind="share"></section>
+      <section class="panel" data-panel="create" data-title="Scaffold vs wire" data-sub="Create-event type distribution" data-tag="CREATE EVENTS" data-dim="event" data-kind="share" data-only="create_scaffold,create_wire"></section>
+      <section class="panel" data-panel="targets" data-title="Create targets" data-sub="Targets selected for create operations" data-tag="BREAKDOWN" data-dim="target" data-kind="share"></section>
+      <section class="panel" data-panel="settings" data-title="Top settings" data-sub="How often each setting is set" data-tag="CONFIGURATION" data-kind="settings"></section>
+    </div>
   </main>
+
+  <footer>
+    <h3>Reading this page</h3>
+    <p><strong>n&lt;5 suppressed:</strong> any value with fewer than 5 events over the last 90 days is hidden and counted as suppressed.</p>
+    <p id="updated"></p>
+    <div class="footnotes">
+      <div>
+        <strong>What is counted</strong>
+        <p>Anonymous and aggregated data from the last 90 days. CI runs are shown only in the CI panels; every other figure covers local runs.</p>
+      </div>
+      <div>
+        <strong>Accepted biases</strong>
+        <p>Opt-out, blocked-network and corporate-proxy users are undercounted. Custom formatters and loaders are masked as "custom".</p>
+      </div>
+    </div>
+  </footer>
 </div>
+
+<script src="vendor/uPlot.iife.min.js"></script>
 <script src="public.js"></script>
 </body>
 </html>

@@ -8,7 +8,7 @@ set -euo pipefail
 out="${1:-stats.json}"
 here="$(dirname "$0")"
 
-sql="SELECT dim, value, SUM(n) AS n FROM daily_counts WHERE dim IN ('formatter','graphqlMajor','loader.kind','pkgVersion') AND measure='raw' AND ci='0' AND day >= date('now','-89 days') AND day <= date('now') GROUP BY dim, value"
+sql="SELECT day, ci, dim, measure, value, SUM(n) AS n FROM daily_counts WHERE day >= date('now','-89 days') AND day <= date('now') AND ((measure='raw' AND (dim IN ('pkgVersion','ci','ciProvider','formatter','graphqlMajor','loader.kind','event','target') OR dim IN ('setting.diffMethod','setting.force','setting.hierarchy','setting.mdxParser','setting.pretty','setting.telemetry'))) OR (measure='debounced_1d' AND dim='event')) GROUP BY day, ci, dim, measure, value"
 
 tmp="$(mktemp "${out}.XXXXXX")"
 trap 'rm -f "$tmp"' EXIT
