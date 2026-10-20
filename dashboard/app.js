@@ -108,7 +108,7 @@
     var axis = { stroke: ink, grid: { stroke: grid, width: 1 }, ticks: { stroke: grid, width: 1 } };
     chart.plot = new window.uPlot({
       width: Math.max(260, chart.holder.clientWidth), height: 240,
-      series: [{}].concat(chart.labels.map(function (label, i) {
+      series: [{ label: "Date", value: "{YYYY}-{MM}-{DD}" }].concat(chart.labels.map(function (label, i) {
         var color = cssVar(seriesVar(i));
         return { label: label, stroke: color, width: 2, points: { size: 5, fill: color } };
       })),
