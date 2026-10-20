@@ -195,7 +195,7 @@
       else section.appendChild(noData());
     });
     rangeLabel.textContent = "Selected range · " + day(data.from) + " – " + day(data.to);
-    var text = "Last updated " + data.generated.slice(0, 10) + " UTC (data from " + data.from + " to " + data.to + ")";
+    var text = "Last updated " + data.generated.slice(0, 16).replace("T", " ") + " UTC (data from " + data.from + " to " + data.to + ")";
     updated.textContent = text;
     setStatus(text, "ok");
   }
