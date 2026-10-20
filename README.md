@@ -20,9 +20,9 @@ No personal data is collected or stored: there are no identifiers, and no IP add
    │
    │  daily cron 02:00 UTC: roll up day D-1 from Analytics Engine
    ▼
- D1  gqlmd-telemetry   daily_counts, config_catalog, rejects_daily, generate_daily, generate_errors_daily (unlimited history)
+ D1  gqlmd-telemetry   daily_counts, config_catalog, config_catalog_daily, rejects_daily, generate_daily, generate_errors_daily (unlimited history)
    │
-   ├──► GET /v1/stats   JSON, Access JWT verified by the Worker
+   ├──► GET /v1/stats (and /catalog, /rejects, /generate)   JSON, Access JWT verified by the Worker
    └──► GET /           static dashboard
         (both on the dashboard Worker, gqlmd-telemetry-dashboard.<sub>.workers.dev,
         whole URL behind Cloudflare Access)
@@ -39,7 +39,7 @@ These hold in every change. Review them before merging anything that touches `wo
 - The only other header read is the Access JWT, and only on `/v1/stats`. `request.cf.colo` is used in memory for rate limits and the quarantine key (KV, 1 h TTL), and is never stored.
 - No `console.log` of request data. `observability.enabled` is `false` in `worker/wrangler.jsonc`.
 - Only allowlisted payload fields are stored (`worker/src/schema.ts`). Reject counters carry the reason only.
-- The dashboard and public pages send a strict Content-Security-Policy (`default-src 'self'`, no inline script or style, `frame-ancestors 'none'`) and `Referrer-Policy: no-referrer`. uPlot is self-hosted in `dashboard/vendor/`. Static assets get the same headers from `dashboard/_headers` and `public/_headers` (keep them identical).
+- The dashboard and public pages send a strict Content-Security-Policy (`default-src 'self'`, no inline script or style, `frame-ancestors 'none'`) and `Referrer-Policy: no-referrer`. uPlot is self-hosted in `dashboard/vendor/`. The dashboard gets the headers from `dashboard/_headers`. GitHub Pages cannot set headers, so the public page carries the policy in a `<meta>` tag in `public/index.html` (no `frame-ancestors`, which meta ignores).
 
 ## Queries
 
@@ -82,7 +82,7 @@ cd infra/bootstrap && tofu init -backend=false && tofu test
 
 ## Public statistics page
 
-The public page is a static site on GitHub Pages at https://telemetry.graphql-markdown.dev. No Worker serves it. It is a read-only copy of the dashboard panels (KPI tiles, time-series charts, share bars, data tables, light/dark theme) with no filters and a fixed last-90-days range. `.github/workflows/public-stats.yml` runs daily and calls `scripts/build-public.sh`, which assembles the page from `public/`, shares `style.css`, the logo, favicon and `vendor/` assets with `dashboard/`, and exports suppressed aggregates (n < 5 hidden) from D1 into `stats.json` through `scripts/export-public.sh`. The result is published to the `gh-pages` branch. It shows the All view (local + CI runs together), like the dashboard default; the CI-vs-local and CI-provider panels split them.
+The public page is a static site on GitHub Pages at https://telemetry.graphql-markdown.dev. No Worker serves it. It is a read-only copy of the dashboard panels (KPI tiles, time-series charts, share bars, data tables, light/dark theme) with no filters and a fixed last-90-days range. `.github/workflows/public-stats.yml` runs daily at 03:00 UTC (and on manual dispatch, on `main` only) and calls `scripts/build-public.sh`, which assembles the page from `public/`, shares `style.css`, the logo, favicon and `vendor/` assets with `dashboard/`, and exports suppressed aggregates (n < 5 hidden) from D1 into `stats.json` through `scripts/export-public.sh` and `scripts/public-stats.jq` (needs `jq`). In `stats.json`, `from` and `to` bound the 90-day range. The result is published to the `gh-pages` branch. It shows the All view (local + CI runs together), like the dashboard default; the CI-vs-local and CI-provider panels split them.
 
 One-time steps:
 
