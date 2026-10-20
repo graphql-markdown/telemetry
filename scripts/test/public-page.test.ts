@@ -13,6 +13,12 @@ const js = read("public/public.js");
 const PANELS = ["versions", "ci", "provider", "formatter", "graphql", "loader", "create", "targets", "settings"];
 
 describe("public page static checks", () => {
+  it("labels the KPI tiles like the dashboard (measure and view)", () => {
+    expect(html).toContain('data-kpi-foot="events">Raw events · local view<');
+    expect(html).toContain('data-kpi-foot="configs">Sum of daily distinct configs<');
+    expect(html).toContain('data-kpi-foot="debounced">Debounced 1d · local view<');
+  });
+
   it("has CSP meta, no inline script/style, no absolute URLs", () => {
     expect(html).toContain(
       `content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'"`,
