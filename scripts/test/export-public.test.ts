@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 const SCRIPT = resolve(__dirname, "../export-public.sh");
 const APP_JS = resolve(__dirname, "../../dashboard/app.js");
 const SETTING_KEYS = ["diffMethod", "force", "hierarchy", "mdxParser", "pretty", "telemetry"];
-const PANELS = ["versions", "ci", "provider", "formatter", "graphql", "loader", "create", "targets"];
+const PANELS = ["versions", "ci", "provider", "formatter", "graphql", "loader"];
 const EMPTY = { series: [], totals: [], suppressed_count: 0 };
 
 type Row = { day: string; ci: string; dim: string; measure: string; value: string; n: number };
@@ -108,20 +108,6 @@ describe("export-public.sh", () => {
     expect(json.kpis.events.totals).toEqual([{ value: "run", n: 11 }]);
     expect(json.kpis.configs.totals).toEqual([{ value: "run", n: 6 }]);
     expect(json.kpis.debounced).toEqual(json.kpis.configs);
-  });
-
-  it("create panel only has create_scaffold and create_wire", () => {
-    const { json } = runRows([
-      row("event", "create_scaffold", 6),
-      row("event", "create_wire", 7),
-      row("event", "run", 50),
-    ]);
-    expect(json.panels.create.totals).toEqual([
-      { value: "create_wire", n: 7 },
-      { value: "create_scaffold", n: 6 },
-    ]);
-    expect(JSON.stringify(json.panels.create)).not.toContain("run");
-    expect(json.panels.create.suppressed_count).toBe(0);
   });
 
   it("settings has all six keys in order, empty when absent", () => {
