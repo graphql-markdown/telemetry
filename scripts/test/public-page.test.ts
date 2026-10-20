@@ -284,6 +284,7 @@ describe("public.js behaviour", () => {
       [5, 6],
       [0, 9],
     ]);
+    expect(p.opts.series[0]).toEqual({ label: "Date", value: "{YYYY}-{MM}-{DD}" });
     const s = section(r, "versions");
     expect(byTag(s, "tr")).toHaveLength(3);
     expect(byTag(s, "td").map((t) => t.textContent)).toEqual(["2026-01-01", "5", "0", "2026-01-02", "6", "9"]);
