@@ -68,7 +68,7 @@ describe("export-public.sh", () => {
     expect(JSON.stringify(json.panels.formatter)).not.toContain("hide");
   });
 
-  it("local panels ignore ci=1, provider ignores ci=0, ci panel has both", () => {
+  it("all-view panels include ci=1, provider ignores ci=0, ci panel has both", () => {
     const { json } = runRows([
       row("formatter", "loc", 10, { ci: "0" }),
       row("formatter", "ci", 10, { ci: "1" }),
@@ -77,12 +77,27 @@ describe("export-public.sh", () => {
       row("ci", "0", 7, { ci: "0" }),
       row("ci", "1", 8, { ci: "1" }),
     ]);
-    expect(json.panels.formatter.totals).toEqual([{ value: "loc", n: 10 }]);
+    expect(json.panels.formatter.totals).toEqual([
+      { value: "ci", n: 10 },
+      { value: "loc", n: 10 },
+    ]);
     expect(json.panels.provider.totals).toEqual([{ value: "gha", n: 10 }]);
     expect(json.panels.ci.totals).toEqual([
       { value: "1", n: 8 },
       { value: "0", n: 7 },
     ]);
+  });
+
+  it("sums ci 0 and 1 rows per day and value, suppressing on the combined total", () => {
+    const { json } = runRows([
+      row("formatter", "shown", 3, { ci: "0" }),
+      row("formatter", "shown", 2, { ci: "1" }),
+      row("formatter", "hidden", 2, { ci: "0" }),
+      row("formatter", "hidden", 2, { ci: "1" }),
+    ]);
+    expect(json.panels.formatter.totals).toEqual([{ value: "shown", n: 5 }]);
+    expect(json.panels.formatter.series).toEqual([{ day: "2026-01-01", value: "shown", n: 5 }]);
+    expect(json.panels.formatter.suppressed_count).toBe(1);
   });
 
   it("separates raw and debounced_1d event kpis", () => {

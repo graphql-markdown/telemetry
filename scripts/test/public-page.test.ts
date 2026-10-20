@@ -64,6 +64,15 @@ describe("public page static checks", () => {
     expect(html).toContain("not suppressed individually");
   });
 
+  it("states that the page shows the all view", () => {
+    const foot = (k: string) => new RegExp(`data-kpi-foot="${k}">([^<]*)<`).exec(html)![1];
+    expect(foot("events")).toBe("Raw events · all view");
+    expect(foot("configs")).toBe("Sum of daily distinct configs");
+    expect(foot("debounced")).toBe("Debounced 1d · all view");
+    expect(html).toContain("Local and CI runs are counted together; the CI vs local chart and the CI provider panel split them.");
+    expect(html).not.toContain("every other figure covers local runs");
+  });
+
   it("CNAME is exact and _headers is absent", () => {
     expect(read("public/CNAME")).toBe("telemetry.graphql-markdown.dev\n");
     expect(existsSync(resolve(root, "public/_headers"))).toBe(false);
