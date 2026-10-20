@@ -5,7 +5,7 @@ import type { Env, RejectReason } from "./env";
 import { fingerprints, formatterOf } from "./fingerprint";
 import { previousDay, rollupDay } from "./rollup";
 import { validate } from "./schema";
-import { handlePublic, handleStats } from "./stats";
+import { handleStats } from "./stats";
 
 type Json = Record<string, unknown>;
 
@@ -259,7 +259,7 @@ const ingest = async (request: Request, env: Env): Promise<Response> => {
 };
 
 /**
- * Headers for dashboard and public responses. The static dashboard at "/" is
+ * Headers for dashboard responses. The static dashboard at "/" is
  * served by assets directly and gets the same headers from dashboard/_headers.
  */
 export const SECURITY_HEADERS: Record<string, string> = {
@@ -304,20 +304,6 @@ export default {
         return secured(new Response("Forbidden", { status: 403 }));
       }
       return secured(await handleStats(url, env));
-    }
-    if (url.pathname === "/public" || url.pathname.startsWith("/public/")) {
-      if (!serves(env, "ingest")) {
-        return new Response("Not Found", { status: 404 });
-      }
-      if (request.method !== "GET") {
-        return secured(
-          new Response("Method Not Allowed", {
-            status: 405,
-            headers: { allow: "GET" },
-          }),
-        );
-      }
-      return secured(await handlePublic(url, env));
     }
     if (url.pathname !== "/v1/event" || !serves(env, "ingest")) {
       return new Response("Not Found", { status: 404 });

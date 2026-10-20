@@ -10,7 +10,7 @@
   "workers_dev": true,
   "preview_urls": false,
 
-  // Picks the routes this Worker serves: /v1/event, /public* and the cron.
+  // Picks the routes this Worker serves: /v1/event and the cron.
   // Also set by infra/worker.tofu; unset (wrangler dev, tests) it serves everything.
   "vars": { "ROLE": "ingest" },
 
@@ -48,14 +48,6 @@
     { "binding": "QUARANTINE", "id": "00000000000000000000000000000001" }
   ],
 
-  // Public page (static, no build step), served only through the Worker at /public so that
-  // PUBLIC_STATS gating applies. The page's css and js are plain assets (/public.css, /public.js).
-  "assets": {
-    "directory": "../public",
-    "binding": "ASSETS",
-    "run_worker_first": ["/v1/*", "/public", "/public/*"]
-  },
-
   // Daily rollup target. database_id is a placeholder for local and test runs;
   // the deployed binding is created by infra/worker.tofu.
   // Deploy and remote migrations go through scripts/deploy.sh, which substitutes the real id.
@@ -68,8 +60,8 @@
     }
   ],
 
-  // The optional public aggregates flag. PUBLIC_STATS is set by infra/worker.tofu and
-  // kept across deploys by keep_vars; local defaults live in worker/.dev.vars.example.
+  // Vars set by infra/worker.tofu are kept across deploys; local defaults live in
+  // worker/.dev.vars.example.
   "keep_vars": true,
 
   // Rollup of day D-1 (UTC).

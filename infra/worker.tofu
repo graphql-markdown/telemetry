@@ -35,9 +35,6 @@ resource "cloudflare_workers_script" "telemetry" {
   content            = file(local.bundle_path) # verify: v5 may prefer content_file + content_sha256
   compatibility_date = "2026-08-01"
 
-  # verify: the public/ static assets (ASSETS binding, run_worker_first) need a
-  # v5 assets upload session, or deploy the Worker with `wrangler deploy` instead.
-
   # Observability (logs and traces) stays off: no request data is logged.
   observability = {
     enabled = false
@@ -114,23 +111,10 @@ resource "cloudflare_workers_script" "telemetry" {
       type = "plain_text"
       text = "ingest"
     },
-    {
-      name = "PUBLIC_STATS"
-      type = "plain_text"
-      text = var.public_stats
-    },
-    {
-      # Uploaded by `wrangler deploy` (public/); kept by keep_assets below.
-      name = "ASSETS"
-      type = "assets"
-    },
   ] # verify: binding attribute names (namespace_id, simple) against the v5 schema
 
-  # wrangler deploy owns the bundle and the public/ assets after the first deploy;
-  # tofu keeps the bindings and vars but must not overwrite the uploaded script.
-  # Without keep_assets and the ASSETS binding, each apply would drop the assets
-  # until the next `wrangler deploy`.
-  keep_assets = true
+  # wrangler deploy owns the bundle after the first deploy; tofu keeps the
+  # bindings and vars but must not overwrite the uploaded script.
 
   lifecycle {
     ignore_changes = [content]

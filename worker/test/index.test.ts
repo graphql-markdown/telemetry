@@ -25,7 +25,7 @@ describe("routing", () => {
 
 describe("roles", () => {
   const get = (path: string, role?: "ingest" | "dashboard", extra: Partial<Env> = {}) => {
-    const { env } = mockEnv({ ROLE: role, PUBLIC_STATS: "true", ...extra } as Partial<Env>);
+    const { env } = mockEnv({ ROLE: role, ...extra } as Partial<Env>);
     return worker.fetch(new Request(`https://telemetry.test${path}`), env);
   };
 
@@ -35,30 +35,30 @@ describe("roles", () => {
     expect((await get("/", "ingest")).status).toBe(404);
   });
 
-  it("ingest still serves /v1/event and /public", async () => {
+  it("ingest still serves /v1/event", async () => {
     const { env, events } = mockEnv({ ROLE: "ingest" } as Partial<Env>);
     const res = await worker.fetch(post(JSON.stringify(payload()), JSON_HEADERS), env);
     expect(res.status).toBe(202);
     expect(events.writeDataPoint).toHaveBeenCalledTimes(1);
-    expect((await get("/public/v1/stats", "ingest", { DB: undefined })).status).not.toBe(404);
   });
 
-  it("ingest serves the public page from its assets, gated by PUBLIC_STATS", async () => {
-    const ASSETS = { fetch: async () => new Response("<h1>public</h1>") };
-    const page = await get("/public", "ingest", { ASSETS } as unknown as Partial<Env>);
-    expect(page.status).toBe(200);
-    expect(await page.text()).toContain("public");
-    const off = await get("/public", "ingest", { ASSETS, PUBLIC_STATS: "false" } as unknown as Partial<Env>);
-    expect(off.status).toBe(404);
+  it("answers 404 on the retired /public routes and never reads D1", async () => {
+    const prepare = vi.fn();
+    const DB = { prepare, batch: prepare, exec: prepare } as unknown as D1Database;
+    for (const role of [undefined, "ingest"] as const) {
+      for (const path of ["/public", "/public/", "/public/v1/stats", "/public.html"]) {
+        const res = await get(path, role, { DB });
+        expect(res.status, `${role} ${path}`).toBe(404);
+      }
+    }
+    expect(prepare).not.toHaveBeenCalled();
   });
 
-  it("dashboard answers 404 on /v1/event and /public", async () => {
+  it("dashboard answers 404 on /v1/event", async () => {
     const { env, events } = mockEnv({ ROLE: "dashboard" } as Partial<Env>);
     const res = await worker.fetch(post(JSON.stringify(payload()), JSON_HEADERS), env);
     expect(res.status).toBe(404);
     expect(events.writeDataPoint).not.toHaveBeenCalled();
-    expect((await get("/public", "dashboard")).status).toBe(404);
-    expect((await get("/public/v1/stats", "dashboard")).status).toBe(404);
   });
 
   it("dashboard still checks the Access JWT on /v1/stats", async () => {

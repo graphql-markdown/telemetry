@@ -4,7 +4,7 @@ import type { Env } from "./env";
  * Privacy invariant, single exception. The Worker never reads request headers
  * other than Content-Type, Content-Encoding and Content-Length, EXCEPT
  * `Cf-Access-Jwt-Assertion` on the dashboard/stats routes (never on
- * /v1/event or /public*). It is used only to verify the Cloudflare Access
+ * /v1/event). It is used only to verify the Cloudflare Access
  * signature and audience. No claim (email, identity, ...) is read, logged or
  * stored.
  */

@@ -75,12 +75,6 @@ variable "access_aud" {
   }
 }
 
-variable "public_stats" {
-  description = "\"true\" enables the public aggregates at /public. Default off."
-  type        = string
-  default     = "false"
-}
-
 variable "worker_bundle_path" {
   description = "Path to the bundled Worker. Null uses ../worker/dist/index.js (tests point it at a fixture)."
   type        = string

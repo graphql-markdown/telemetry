@@ -27,8 +27,8 @@ No personal data is collected or stored: there are no identifiers, and no IP add
         (both on the dashboard Worker, gqlmd-telemetry-dashboard.<sub>.workers.dev,
         whole URL behind Cloudflare Access)
 
- Ingest Worker also serves GET /public (optional aggregates, only when PUBLIC_STATS=true;
- page assets from public/)
+ Public page: static site on GitHub Pages (telemetry.graphql-markdown.dev), rebuilt daily by
+ .github/workflows/public-stats.yml from scripts/export-public.sh (no Worker route)
 ```
 
 ## Privacy invariants
@@ -79,6 +79,18 @@ Plan-only OpenTofu tests use mocked providers, so no credentials are needed. The
 cd infra && tofu init -backend=false && tofu test
 cd infra/bootstrap && tofu init -backend=false && tofu test
 ```
+
+## Public statistics page
+
+The public page is a static site on GitHub Pages at https://telemetry.graphql-markdown.dev. No Worker serves it. `.github/workflows/public-stats.yml` runs daily, calls `scripts/export-public.sh` to export suppressed aggregates (n < 5 hidden) from D1 into `stats.json`, and publishes it with the page assets from `public/` to the `gh-pages` branch.
+
+One-time steps:
+
+1. Repository Settings > Pages: set the source to the `gh-pages` branch.
+2. Set the custom domain to `telemetry.graphql-markdown.dev` and enable Enforce HTTPS.
+3. Add the DNS record `CNAME telemetry -> graphql-markdown.github.io`.
+
+The workflow needs the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets to read D1. Prefer a read-only D1 token (D1 Read only) over the deploy token.
 
 ## Setup
 
@@ -140,7 +152,7 @@ Add these under Settings > Secrets and variables > Actions. The names match the 
 | `ACCESS_AUD` | variable | `access_aud`, the AUD tag of the Access application (step 5) |
 | `DASHBOARD_EMAILS` | secret | `dashboard_emails`, a JSON list such as `["you@example.com"]`; a secret so the addresses stay out of the public logs |
 
-Only the `deploy` job reads them. For manual runs, export the same values as `TF_VAR_account_id`, `TF_VAR_workers_subdomain`, `TF_VAR_cloudflare_api_token`, `TF_VAR_state_passphrase`, `TF_VAR_ae_sql_token`, `TF_VAR_access_team_domain`, `TF_VAR_access_aud` and `TF_VAR_dashboard_emails` (and optionally `TF_VAR_alert_webhook`, `TF_VAR_public_stats`).
+Only the `deploy` job reads them. For manual runs, export the same values as `TF_VAR_account_id`, `TF_VAR_workers_subdomain`, `TF_VAR_cloudflare_api_token`, `TF_VAR_state_passphrase`, `TF_VAR_ae_sql_token`, `TF_VAR_access_team_domain`, `TF_VAR_access_aud` and `TF_VAR_dashboard_emails` (and optionally `TF_VAR_alert_webhook`).
 
 ### 5. Initialise and apply the infrastructure
 
@@ -155,7 +167,7 @@ tofu init -backend-config="endpoints={s3=\"https://<account id>.r2.cloudflaresto
 tofu apply -var access_aud=pending
 ```
 
-This creates the D1 database, the quarantine KV namespace, and the two Workers with their workers.dev URLs. The ingest Worker gets the secrets and `PUBLIC_STATS`, the dashboard Worker gets `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD`. `PUBLIC_STATS` is owned by tofu (`public_stats`, default `"false"`); `keep_vars` stops `wrangler deploy` from resetting it. It also creates the One-time PIN identity provider and the `gqlmd-telemetry-dashboard` Access policy.
+This creates the D1 database, the quarantine KV namespace, and the two Workers with their workers.dev URLs. The ingest Worker gets the secrets, the dashboard Worker gets `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD`. It also creates the One-time PIN identity provider and the `gqlmd-telemetry-dashboard` Access policy.
 
 The Cloudflare API refuses an Access application on a workers.dev host (error 12130), so tofu does not create it and `access_aud` is required. The dashboard Worker must exist before its Access toggle does, hence two passes. With the placeholder `pending` the dashboard rejects every request until the real value is set:
 
