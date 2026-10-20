@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -91,5 +91,55 @@ describe("export-public.sh", () => {
   it("preserves fractional n as given", () => {
     const { json } = runRows([{ dim: "formatter", value: "f", n: 12.5 }]);
     expect(json.dims.formatter.totals).toEqual([{ value: "f", n: 12.5 }]);
+  });
+});
+
+describe("export-public.sh against the D1 API", () => {
+  // Stub curl: logs each call, answers the database lookup and the query from fixtures,
+  // or fails like `curl --fail-with-body` with the API's error body.
+  const stubCurl = (opts: { fail?: boolean } = {}) => {
+    const bin = join(dir, "bin");
+    const log = join(dir, "curl.log");
+    mkdirSync(bin);
+    const lookup = JSON.stringify({ result: [{ name: "other", uuid: "wrong" }, { name: "gqlmd-telemetry", uuid: "db-123" }] });
+    const query = JSON.stringify({
+      result: [{ results: [{ dim: "formatter", value: "a", n: 9 }, { dim: "formatter", value: "b", n: 2 }], success: true }],
+    });
+    const body = opts.fail
+      ? `printf '%s' '{"errors":[{"code":10000,"message":"Authentication error"}]}'; exit 22`
+      : `case "$*" in *"/db-123/query"*) printf '%s' '${query}' ;; *) printf '%s' '${lookup}' ;; esac`;
+    writeFileSync(join(bin, "curl"), `#!/usr/bin/env bash\necho "$*" >> "${log}"\n${body}\n`, { mode: 0o755 });
+    return { bin, log };
+  };
+
+  const runApi = (bin: string) => {
+    const out = join(dir, "stats.json");
+    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, CLOUDFLARE_API_TOKEN: "tok", CLOUDFLARE_ACCOUNT_ID: "acct" };
+    delete env.D1_JSON_FILE;
+    const res = spawnSync(SCRIPT, [out], { env, encoding: "utf8" });
+    return { res, out };
+  };
+
+  it("looks the database up by name, then queries it by id", () => {
+    const { bin, log } = stubCurl();
+    const { res, out } = runApi(bin);
+    expect(res.status).toBe(0);
+    const calls = readFileSync(log, "utf8").trim().split("\n");
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toContain("/accounts/acct/d1/database?name=gqlmd-telemetry");
+    expect(calls[1]).toContain("/accounts/acct/d1/database/db-123/query");
+    expect(calls[1]).toContain("daily_counts");
+    const json = JSON.parse(readFileSync(out, "utf8"));
+    expect(json.dims.formatter.totals).toEqual([{ value: "a", n: 9 }]);
+    expect(json.dims.formatter.suppressed_count).toBe(1);
+  });
+
+  it("prints the API error body and writes no output on failure", () => {
+    const { bin } = stubCurl({ fail: true });
+    const { res, out } = runApi(bin);
+    expect(res.status).not.toBe(0);
+    expect(res.stderr).toContain("Authentication error");
+    expect(res.stderr).not.toContain("tok");
+    expect(existsSync(out)).toBe(false);
   });
 });
