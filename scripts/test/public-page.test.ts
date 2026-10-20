@@ -252,7 +252,7 @@ describe("public.js behaviour", () => {
 
   it("formats the last-updated line and range", async () => {
     const r = await runPage(ok(fixture));
-    expect(r.els.updated.textContent).toBe("Last updated 2026-01-02 UTC (data from 2025-10-05 to 2026-01-02)");
+    expect(r.els.updated.textContent).toBe("Last updated 2026-01-02 03:04 UTC (data from 2025-10-05 to 2026-01-02)");
     expect(r.els.rangeLabel.textContent).toBe("Selected range · 5 Oct 2025 – 2 Jan 2026");
     expect(r.els.statusDot.className).toBe("dot ok");
   });
