@@ -152,13 +152,13 @@ describe("export-public.sh", () => {
     expect(existsSync(out)).toBe(false);
   });
 
-  it("emits version 2, min_count, 90-day range and midnight-UTC generated", () => {
+  it("emits version 2, min_count, 90-day range and full UTC timestamp generated", () => {
     const { json } = runRows([]);
     expect(json.version).toBe(2);
     expect(json.min_count).toBe(5);
     expect(json.from).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(json.to).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(json.generated).toMatch(/^\d{4}-\d{2}-\d{2}T00:00:00Z$/);
+    expect(json.generated).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
     expect((Date.parse(json.to) - Date.parse(json.from)) / 86400000).toBe(89);
   });
 

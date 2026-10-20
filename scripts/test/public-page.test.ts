@@ -150,7 +150,7 @@ function sectionsFromHtml(): El[] {
 
 const fixture = {
   version: 2,
-  generated: "2026-01-02T00:00:00Z",
+  generated: "2026-01-02T03:04:05Z",
   from: "2025-10-05",
   to: "2026-01-02",
   min_count: 5,
