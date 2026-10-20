@@ -21,6 +21,10 @@ describe("public-stats workflow", () => {
     expect(wf).toContain("if: github.ref == 'refs/heads/main'");
   });
 
+  it("is not behind an environment gate (secrets are repository level)", () => {
+    expect(wf).not.toMatch(/^\s*environment:/m);
+  });
+
   it("has read-only top-level and write-only job-level permissions", () => {
     expect(top).toMatch(/^permissions:\n {2}contents: read\n/m);
     expect(top).not.toMatch(/contents: write/);

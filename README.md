@@ -90,7 +90,7 @@ One-time steps:
 2. Set the custom domain to `telemetry.graphql-markdown.dev` and enable Enforce HTTPS.
 3. Add the DNS record `CNAME telemetry -> graphql-markdown.github.io`.
 
-The workflow needs the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets to read D1. Prefer a read-only D1 token (D1 Read only) over the deploy token.
+The workflow needs the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets to read D1. It does not use the `production` environment, so no approval gate applies. Prefer a read-only D1 token (D1 Read only) over the deploy token.
 
 ## Setup
 
