@@ -97,8 +97,16 @@
   }
 
   function renderSeries(section, data) {
-    var days = Array.from(new Set(data.series.map(function (r) { return r.day; }))).sort();
+    var seen = Array.from(new Set(data.series.map(function (r) { return r.day; }))).sort();
     var values = data.totals.map(function (t) { return t.value; });
+    // Days without rows are zero, not missing: fill every day between the first and the last
+    // so the line does not interpolate across them (the export only carries days with data).
+    var days = [];
+    if (seen.length) {
+      for (var ms = Date.parse(seen[0] + "T00:00:00Z"), end = Date.parse(seen[seen.length - 1] + "T00:00:00Z"); ms <= end; ms += 86400000) {
+        days.push(new Date(ms).toISOString().slice(0, 10));
+      }
+    }
     if (!days.length) { section.appendChild(noData()); section.appendChild(suppressedNote(data.suppressed_count)); return; }
     var lookup = {};
     data.series.forEach(function (r) { lookup[r.day + "|" + r.value] = r.n; });

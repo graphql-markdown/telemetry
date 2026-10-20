@@ -289,6 +289,29 @@ describe("public.js behaviour", () => {
     expect(byTag(s, "td").map((t) => t.textContent)).toEqual(["2026-01-01", "5", "0", "2026-01-02", "6", "9"]);
   });
 
+  it("fills days without rows with zero instead of interpolating across them", async () => {
+    const gap = {
+      ...fixture,
+      panels: {
+        ...fixture.panels,
+        versions: {
+          series: [
+            { day: "2026-01-01", value: "a", n: 23 },
+            { day: "2026-01-04", value: "a", n: 66 },
+          ],
+          totals: [{ value: "a", n: 89 }],
+          suppressed_count: 0,
+        },
+      },
+    };
+    const r = await runPage(ok(gap));
+    const day = (d: string) => Date.parse(`${d}T00:00:00Z`) / 1000;
+    expect(r.plots[0].cols).toEqual([[day("2026-01-01"), day("2026-01-02"), day("2026-01-03"), day("2026-01-04")], [23, 0, 0, 66]]);
+    expect(byTag(section(r, "versions"), "td").map((t) => t.textContent)).toEqual([
+      "2026-01-01", "23", "2026-01-02", "0", "2026-01-03", "0", "2026-01-04", "66",
+    ]);
+  });
+
   it("settings panel sums totals per setting", async () => {
     const r = await runPage(ok(fixture));
     const s = section(r, "settings");
