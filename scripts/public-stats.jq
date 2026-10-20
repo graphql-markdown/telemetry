@@ -32,7 +32,7 @@
       };
   {
     version: 2,
-    generated: (now | strftime("%Y-%m-%dT%H:%M:%SZ")),
+    generated: (now | strftime("%Y-%m-%dT00:00:00Z")),
     from: ((now - 89 * 86400) | strftime("%Y-%m-%d")),
     to: (now | strftime("%Y-%m-%d")),
     min_count: $min,
