@@ -47,9 +47,7 @@
       provider: panel("ciProvider"; "raw"; $ci; null),
       formatter: panel("formatter"; "raw"; $all; null),
       graphql: panel("graphqlMajor"; "raw"; $all; null),
-      loader: panel("loader.kind"; "raw"; $all; null),
-      create: panel("event"; "raw"; $all; ["create_scaffold", "create_wire"]),
-      targets: panel("target"; "raw"; $all; null)
+      loader: panel("loader.kind"; "raw"; $all; null)
     },
     settings: [
       ["diffMethod", "force", "hierarchy", "mdxParser", "pretty", "telemetry"][] as $k

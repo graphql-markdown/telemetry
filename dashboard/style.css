@@ -120,6 +120,7 @@ code { font-size: .95em; }
 .hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
 .hero h2 { font-size: 27px; line-height: 1.15; letter-spacing: -.045em; margin: 0 0 7px; }
 .hero p { margin: 0; color: var(--muted); max-width: 680px; }
+.hero p a { color: var(--accent); }
 .range-label { color: var(--muted); font-size: 12px; white-space: nowrap; }
 
 /* Filters */

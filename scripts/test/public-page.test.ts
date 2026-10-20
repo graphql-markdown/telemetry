@@ -10,7 +10,7 @@ const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 const html = read("public/index.html");
 const js = read("public/public.js");
 
-const PANELS = ["versions", "ci", "provider", "formatter", "graphql", "loader", "create", "targets", "settings"];
+const PANELS = ["versions", "ci", "provider", "formatter", "graphql", "loader", "settings"];
 
 describe("public page static checks", () => {
   it("has CSP meta, no inline script/style, no absolute URLs", () => {
@@ -21,7 +21,9 @@ describe("public page static checks", () => {
     expect(html).not.toMatch(/<style\b/i);
     expect(html).not.toMatch(/\sstyle=/);
     expect(html).not.toMatch(/\son[a-z]+=/i);
-    for (const text of [html, js]) expect(text).not.toMatch(/https?:\/\//);
+    // The only external reference is the navigation link to the project site.
+    const withoutProjectLink = html.replace('<a href="https://graphql-markdown.dev/" rel="noopener">', "<a>");
+    for (const text of [withoutProjectLink, js]) expect(text).not.toMatch(/https?:\/\//);
   });
 
   it("references the shared dashboard assets relatively", () => {
@@ -179,12 +181,6 @@ const fixture = {
     formatter: { series: [], totals: [{ value: "x", n: 750 }, { value: "y", n: 250 }], suppressed_count: 0 },
     graphql: { series: [], totals: [], suppressed_count: 2 },
     loader: { series: [], totals: [], suppressed_count: 0 },
-    create: {
-      series: [],
-      totals: [{ value: "create_scaffold", n: 4 }, { value: "create_wire", n: 6 }, { value: "other", n: 99 }],
-      suppressed_count: 0,
-    },
-    targets: { series: [], totals: [], suppressed_count: 0 },
   },
   settings: [
     { key: "force", totals: [{ value: "true", n: 5 }, { value: "false", n: 7 }], suppressed_count: 1 },
@@ -270,11 +266,6 @@ describe("public.js behaviour", () => {
     expect(byTag(s, "summary")[0].textContent).toBe("Data table");
     expect(byClass(section(r, "graphql"), "empty")).toHaveLength(1);
     expect(byClass(section(r, "graphql"), "privacy")[0].textContent).toBe("2 value(s) hidden (n<5)");
-  });
-
-  it("limits create to scaffold and wire", async () => {
-    const r = await runPage(ok(fixture));
-    expect(byClass(section(r, "create"), "label").map((l) => l.textContent)).toEqual(["create_scaffold", "create_wire"]);
   });
 
   it("ci panel uses local/CI labels", async () => {
@@ -375,7 +366,7 @@ describe("build-public.sh", () => {
       expect(res.status).toBe(0);
       const built = (p: string) => resolve(out, p);
       const page = readFileSync(built("index.html"), "utf8");
-      const refs = [...page.matchAll(/\b(?:href|src)="([^"]+)"/g)].map((m) => m[1]);
+      const refs = [...page.matchAll(/\b(?:href|src)="([^"]+)"/g)].map((m) => m[1]).filter((r) => r !== "https://graphql-markdown.dev/");
       expect(refs.length).toBeGreaterThan(5);
       for (const ref of refs) expect(existsSync(built(ref)), ref).toBe(true);
       const cssText = readFileSync(built("style.css"), "utf8");
