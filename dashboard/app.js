@@ -120,8 +120,19 @@
     }, chart.cols, chart.holder);
   }
 
+  /* The API only returns days that have rows. Fill every day between the first and the last with
+     zero, otherwise a day without runs vanishes from the axis and the line is drawn across it. */
+  function fillDays(days) {
+    var out = [];
+    if (!days.length) return out;
+    for (var ms = Date.parse(days[0] + "T00:00:00Z"), end = Date.parse(days[days.length - 1] + "T00:00:00Z"); ms <= end; ms += 86400000) {
+      out.push(iso(new Date(ms)));
+    }
+    return out;
+  }
+
   function renderSeries(section, data) {
-    var days = Array.from(new Set(data.series.map(function (r) { return r.day; }))).sort();
+    var days = fillDays(Array.from(new Set(data.series.map(function (r) { return r.day; }))).sort());
     var values = data.totals.map(function (t) { return t.value; });
     if (!days.length) { section.appendChild(noData()); section.appendChild(suppressedNote(data.suppressed_count)); return; }
     var lookup = {};
