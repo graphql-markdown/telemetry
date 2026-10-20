@@ -21,7 +21,6 @@ jobs:
     name: Publish
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: production
     permissions:
       contents: write
     steps:
