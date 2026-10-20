@@ -6,7 +6,7 @@
     if (!r.ok) { throw new Error("HTTP " + r.status); }
     return r.json();
   }).then(function (data) {
-    updated.textContent = "Updated " + data.generated.slice(0, 10) + " (data from " + data.from + " to " + data.to + ")";
+    updated.textContent = "Last updated " + data.generated.slice(0, 16).replace("T", " ") + " UTC (data from " + data.from + " to " + data.to + ")";
     DIMS.forEach(function (d) {
       var h = document.createElement("h2"); h.textContent = d[1]; out.appendChild(h);
       var t = document.createElement("table");

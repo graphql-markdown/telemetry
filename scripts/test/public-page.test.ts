@@ -98,7 +98,7 @@ describe("public.js behaviour", () => {
       dims: { formatter: { totals: [{ value: "Value", n: 1234 }], suppressed_count: 0 } },
     };
     const { out, updated } = await runPage(ok(data));
-    expect(updated.textContent).toContain("2026-01-02");
+    expect(updated.textContent).toContain("Last updated 2026-01-02 03:04 UTC");
     const table = out.children.find((c) => c.tag === "table")!;
     const row = table.children[1];
     expect(row.children[0].textContent).toBe("Value");
