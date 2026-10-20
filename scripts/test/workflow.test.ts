@@ -38,9 +38,9 @@ describe("public-stats workflow", () => {
     for (const r of refs) expect(lock).toContain(`'${r}'`);
   });
 
-  it("copies public/ recursively so vendor/ is published", () => {
-    expect(wf).toContain("cp -R public/. _site/");
-    expect(wf).not.toContain("cp public/*");
+  it("builds the site with scripts/build-public.sh", () => {
+    expect(wf).toContain("run: scripts/build-public.sh _site");
+    expect(wf).not.toContain("cp public");
   });
 
   it("keeps Cloudflare secrets in step-level env only", () => {
