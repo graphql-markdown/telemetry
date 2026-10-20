@@ -59,6 +59,11 @@ describe("public page static checks", () => {
     expect(html).toMatch(/<meta name="robots" content="[^"]*noindex[^"]*nofollow[^"]*">/);
   });
 
+  it("states that n<5 suppression applies to the 90-day total, not to each day", () => {
+    expect(html).toContain("The rule applies to the 90-day total of each value");
+    expect(html).toContain("not suppressed individually");
+  });
+
   it("CNAME is exact and _headers is absent", () => {
     expect(read("public/CNAME")).toBe("telemetry.graphql-markdown.dev\n");
     expect(existsSync(resolve(root, "public/_headers"))).toBe(false);

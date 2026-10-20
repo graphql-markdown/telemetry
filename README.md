@@ -59,7 +59,7 @@ Notes:
 - Always weight Analytics Engine rows with `SUM(_sample_interval * double1)`. Never use `count()`: sampled-out and flooded events carry a weight above 1.
 - There are three measures. **Events** are raw data points, an upper bound. **Debounced** counts (1 d windows, one per distinct config per day) are sums of daily values. **Distinct configs** (`fp_shape`) are a lower bound. The true number lies in between.
 - Quarantined rows (`blob17 = '1'`) are kept in Analytics Engine but excluded from `raw` and from the public aggregates.
-- The `n<5` rule applies after aggregation: any value with fewer than 5 events in the selected range is hidden and counted as suppressed. Do not publish per-row counts below that threshold.
+- The `n<5` rule applies after aggregation: any value with fewer than 5 events in the selected range is hidden and counted as suppressed. The rule is on the range total per value: the daily points of a value that is shown are published as they are (dashboard and public page), so small per-day counts can be visible.
 
 ## Generate event
 
