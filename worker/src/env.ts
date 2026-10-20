@@ -1,7 +1,7 @@
 /** Worker bindings (see worker/wrangler.jsonc). */
 export interface Env {
   /**
-   * Which routes this deployment serves: `"ingest"` (/v1/event, /public*, cron) or
+   * Which routes this deployment serves: `"ingest"` (/v1/event, cron) or
    * `"dashboard"` (/v1/stats*, assets). Unset (local dev, tests) serves everything.
    */
   ROLE?: "ingest" | "dashboard";
@@ -29,9 +29,7 @@ export interface Env {
   ACCESS_TEAM_DOMAIN?: string;
   /** Access application AUD tag the JWT must carry. */
   ACCESS_AUD?: string;
-  /** `"true"` enables the public aggregates (`/public`). Default `"false"`: 404. */
-  PUBLIC_STATS?: string;
-  /** Static assets (dashboard). */
+  /** Static assets (dashboard Worker only). */
   ASSETS?: Fetcher;
   /** Comma-separated retired payload versions (answered with 410). Empty by default. */
   RETIRED_VERSIONS?: string;

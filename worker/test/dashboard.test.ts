@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import app from "../../dashboard/app.js?raw";
 import css from "../../dashboard/style.css?raw";
 import html from "../../dashboard/index.html?raw";
-import publicHtml from "../../public/public.html?raw";
 import vendorReadme from "../../dashboard/vendor/README.md?raw";
 
 describe("dashboard assets", () => {
@@ -11,7 +10,7 @@ describe("dashboard assets", () => {
     expect(vendorReadme).toContain("1.6.31");
     expect(html).toContain('src="vendor/uPlot.iife.min.js"');
     expect(html).toContain('href="vendor/uPlot.min.css"');
-    for (const page of [html, publicHtml, app]) {
+    for (const page of [html, app]) {
       expect(page).not.toMatch(/https?:\/\//);
     }
   });

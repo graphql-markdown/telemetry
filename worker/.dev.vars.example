@@ -2,4 +2,3 @@
 # In production these are set by tofu (infra/worker.tofu) and kept by keep_vars.
 ACCESS_TEAM_DOMAIN=example.cloudflareaccess.com
 ACCESS_AUD=local-dev-aud
-PUBLIC_STATS=false

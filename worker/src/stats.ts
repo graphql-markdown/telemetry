@@ -85,20 +85,16 @@ export const parseQuery = (params: URLSearchParams): Parsed<Query> => {
 const ciOf = (view: Query["view"]): [string, string] =>
   view === "local" ? ["0", "0"] : view === "ci" ? ["1", "1"] : ["0", "1"];
 
-/** SQL bucket expression for the `day` column; constant text, never user input. */
-const bucketOf = (weekly: boolean): string =>
-  weekly ? "date(day, 'weekday 0', '-6 days')" : "day";
-
 /**
  * Aggregate one dimension over the range. Suppression (total < MIN_COUNT) is
  * applied after summing over the whole range, not per day.
  */
-export const statsFor = async (env: Env, query: Query, weekly = false): Promise<Response> => {
+export const statsFor = async (env: Env, query: Query): Promise<Response> => {
   const [ciA, ciB] = ciOf(query.view);
   const { results } = await env.DB.prepare(
-    `SELECT ${bucketOf(weekly)} AS day, value, SUM(n) AS n FROM daily_counts
+    `SELECT day, value, SUM(n) AS n FROM daily_counts
      WHERE dim = ?1 AND measure = ?2 AND day >= ?3 AND day <= ?4 AND ci IN (?5, ?6)
-     GROUP BY 1, value ORDER BY 1, value`,
+     GROUP BY day, value ORDER BY day, value`,
   )
     .bind(query.dim, query.measure, query.from, query.to, ciA, ciB)
     .all<{ day: string; value: string; n: number }>();
@@ -113,7 +109,7 @@ export const statsFor = async (env: Env, query: Query, weekly = false): Promise<
     view: query.view,
     from: query.from,
     to: query.to,
-    granularity: weekly ? "week" : "day",
+    granularity: "day",
     series: results.filter((row) => shown.has(row.value)),
     totals: [...totals]
       .filter(([value]) => shown.has(value))
@@ -288,25 +284,4 @@ export const handleStats = async (url: URL, env: Env): Promise<Response> => {
     default:
       return new Response("Not Found", { status: 404 });
   }
-};
-
-/**
- * Optional public aggregates (`PUBLIC_STATS=true`), no Access. Reads no request
- * header. Always the raw measure, the local view and weekly buckets, with the
- * same n < 5 suppression; quarantined events are never part of `raw`.
- */
-export const handlePublic = async (url: URL, env: Env): Promise<Response> => {
-  if (env.PUBLIC_STATS !== "true") {
-    return new Response("Not Found", { status: 404 });
-  }
-  if (url.pathname === "/public") {
-    const page = await env.ASSETS?.fetch(new Request(new URL("/public.html", url)));
-    return page && page.ok ? new Response(page.body, page) : new Response("Not Found", { status: 404 });
-  }
-  if (url.pathname === "/public/v1/stats") {
-    const query = parseQuery(url.searchParams);
-    if (!query.ok) return bad(query.error);
-    return statsFor(env, { ...query.value, measure: "raw", view: "local" }, true);
-  }
-  return new Response("Not Found", { status: 404 });
 };

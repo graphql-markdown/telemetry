@@ -49,11 +49,6 @@ run "worker_script" {
     condition     = [for b in cloudflare_workers_script.telemetry.bindings : b.type if b.name == "DB"][0] == "d1"
     error_message = "DB must be a d1 binding"
   }
-
-  assert {
-    condition     = [for b in cloudflare_workers_script.telemetry.bindings : b.text if b.name == "PUBLIC_STATS"][0] == "false"
-    error_message = "PUBLIC_STATS must default to \"false\""
-  }
 }
 
 run "no_secret_as_plain_text" {
@@ -123,11 +118,8 @@ run "assets_kept_across_applies" {
   command = plan
 
   assert {
-    condition = alltrue([
-      for s in [cloudflare_workers_script.telemetry, cloudflare_workers_script.dashboard] :
-      s.keep_assets == true && contains([for b in s.bindings : b.type if b.name == "ASSETS"], "assets")
-    ])
-    error_message = "both Workers must declare the ASSETS binding and keep the assets wrangler uploaded"
+    condition     = cloudflare_workers_script.dashboard.keep_assets == true && contains([for b in cloudflare_workers_script.dashboard.bindings : b.type if b.name == "ASSETS"], "assets")
+    error_message = "the dashboard Worker must declare the ASSETS binding and keep the assets wrangler uploaded"
   }
 }
 

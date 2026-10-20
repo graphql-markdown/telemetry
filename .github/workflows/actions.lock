@@ -7,6 +7,9 @@ workflows:
         - 'actions/checkout@v7.0.1'
         - 'opentofu/setup-opentofu@v2.0.2'
         - 'oven-sh/setup-bun@v2.2.0'
+    '.github/workflows/public-stats.yml':
+        - 'actions/checkout@v7.0.1'
+        - 'oven-sh/setup-bun@v2.2.0'
 dependencies:
     'actions/checkout@v7.0.1':
         ref: 'v7.0.1'
