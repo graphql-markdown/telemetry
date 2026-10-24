@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#485e58">
+  <meta name="robots" content="noindex, nofollow, noarchive, noimageindex, noai, noimageai">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'">
+  <title>GraphQL-Markdown · Usage statistics</title>
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/uPlot.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div class="topline">
+      <div class="brand">
+        <img class="logo" src="logo.svg" alt="" width="44" height="44">
+        <div><div class="eyebrow">GraphQL-Markdown</div><h1>Usage statistics</h1></div>
+      </div>
+      <div class="top-actions">
+        <span class="status-pill"><span class="dot" id="statusDot"></span><span id="status" role="status">Loading...</span></span>
+        <button class="button" id="themeButton" type="button" aria-label="Toggle theme">◐&nbsp; Theme</button>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div>
+        <h2>Usage &amp; configuration</h2>
+        <p>Anonymous, aggregated adoption and configuration patterns across <a href="https://graphql-markdown.dev/" rel="noopener">GraphQL-Markdown</a> over the last 90 days.</p>
+      </div>
+      <div class="range-label" id="rangeLabel"></div>
+    </div>
+  </header>
+
+  <main>
+    <div class="section-head">
+      <div><div class="section-kicker">At a glance</div><h3>Core activity</h3></div>
+      <span class="panel-tag">LAST 90 DAYS</span>
+    </div>
+    <div class="kpis kpis-3" id="kpis">
+      <article class="kpi"><div class="kpi-top"><span>Events</span><span class="kpi-icon" aria-hidden="true">↗</span></div><div class="kpi-value" data-kpi="events">—</div><div class="kpi-foot" data-kpi-foot="events">Raw events · all view</div></article>
+      <article class="kpi"><div class="kpi-top"><span>Distinct configs</span><span class="kpi-icon" aria-hidden="true">⌘</span></div><div class="kpi-value" data-kpi="configs">—</div><div class="kpi-foot" data-kpi-foot="configs">Sum of daily distinct configs</div></article>
+      <article class="kpi"><div class="kpi-top"><span>Debounced activity</span><span class="kpi-icon" aria-hidden="true">◷</span></div><div class="kpi-value" data-kpi="debounced">—</div><div class="kpi-foot" data-kpi-foot="debounced">Debounced 1d · all view</div></article>
+    </div>
+
+    <div class="section-head">
+      <div><div class="section-kicker">Trends &amp; breakdowns</div><h3>Usage patterns</h3></div>
+    </div>
+    <div class="grid" id="panels">
+      <section class="panel wide" data-panel="versions" data-title="Runs per day by version" data-sub="Daily activity split by package version" data-tag="TIME SERIES" data-dim="pkgVersion" data-kind="series"></section>
+      <section class="panel" data-panel="ci" data-title="CI vs local runs per day" data-sub="Runs per day by execution context" data-tag="TIME SERIES" data-dim="ci" data-kind="series" data-view="all" data-labels="ci"></section>
+      <section class="panel" data-panel="provider" data-title="CI provider share" data-sub="Distribution of detected CI providers" data-tag="BREAKDOWN" data-dim="ciProvider" data-kind="share" data-view="ci"></section>
+      <section class="panel" data-panel="formatter" data-title="Formatter share" data-sub="Custom formatters are masked as “custom”" data-tag="BREAKDOWN" data-dim="formatter" data-kind="share" data-labels="formatter"></section>
+      <section class="panel" data-panel="graphql" data-title="GraphQL major version" data-sub="Usage by GraphQL major version" data-tag="BREAKDOWN" data-dim="graphqlMajor" data-kind="share"></section>
+      <section class="panel" data-panel="loader" data-title="Loader kinds" data-sub="Custom loaders are masked as “custom”" data-tag="BREAKDOWN" data-dim="loader.kind" data-kind="share"></section>
+      <section class="panel" data-panel="settings" data-title="Top settings" data-sub="How often each setting is set" data-tag="CONFIGURATION" data-kind="settings"></section>
+    </div>
+  </main>
+
+  <footer>
+    <h3>Reading this page</h3>
+    <p><strong>n&lt;5 suppressed:</strong> any value with fewer than 5 events over the last 90 days is hidden and counted as suppressed. The rule applies to the 90-day total of each value; daily figures of a shown value are not suppressed individually.</p>
+    <p id="updated"></p>
+    <div class="footnotes">
+      <div>
+        <strong>What is counted</strong>
+        <p>Anonymous and aggregated data from the last 90 days. Local and CI runs are counted together; the CI vs local chart and the CI provider panel split them.</p>
+      </div>
+      <div>
+        <strong>Accepted biases</strong>
+        <p>Opt-out, blocked-network and corporate-proxy users are undercounted. Custom formatters and loaders are masked as "custom".</p>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<script src="vendor/uPlot.iife.min.js"></script>
+<script src="public.js"></script>
+</body>
+</html>
