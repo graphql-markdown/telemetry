@@ -1,4 +1,5 @@
 import type { Env } from "./env";
+import { canonicalJson } from "./fingerprint";
 import { VALUE_STRINGS } from "./schema";
 
 /** At most this many `daily_counts` rows (and catalog rows) are written per day. */
@@ -156,6 +157,15 @@ const addColo = (counts: Counts, dim: string, value: string, row: Row): void => 
   add(counts, [String(row.ci), dim, value, "colo_sampled"].join(KEY_SEP), Number(row.colo_sampled ?? 0));
 };
 
+/** Config JSON with keys sorted at every level (blob18 rows written before sorting). */
+const normalizeConfig = (config: string): string => {
+  try {
+    return canonicalJson(JSON.parse(config));
+  } catch {
+    return config;
+  }
+};
+
 /** Top-level config keys whose value is an enum or mask token (or a boolean). */
 const settingsOf = (config: string): Array<[string, string]> => {
   let parsed: unknown;
@@ -267,7 +277,7 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
   for (const row of await query(env, catalogSql(day))) {
     const id = String(row.fp_shape);
     const shape = shapes.get(id) ?? {
-      config: String(row.config),
+      config: normalizeConfig(String(row.config)),
       versions: new Set<string>(),
       events: 0,
       debounced: 0,
@@ -388,6 +398,7 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
           `INSERT INTO config_catalog (fp_shape, masked_config_json, versions_seen, first_seen, last_seen, events, debounced_events, last_rolled_day)
            VALUES (?1, ?2, ?3, ?4, ?4, ?5, ?6, ?4)
            ON CONFLICT(fp_shape) DO UPDATE SET
+             masked_config_json = excluded.masked_config_json,
              versions_seen = excluded.versions_seen,
              last_seen = excluded.last_seen,
              events = config_catalog.events + excluded.events,
