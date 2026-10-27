@@ -98,7 +98,12 @@ while IFS= read -r chunk; do
   n="$(api --header 'Content-Type: application/json' --data "$body" "${base}/${db_id}/query" \
     | jq -er '.result[0].meta.changes')"
   changed=$((changed + n))
+# Each line is one chunk as a compact JSON array, bound as text for json_each.
 done < <(printf '%s\n' "$plan" | jq -sc --argjson size "$CHUNK" '
-  [range(0; length; $size) as $i | .[$i:$i + $size]] | .[] | tojson')
+  [range(0; length; $size) as $i | .[$i:$i + $size]] | .[]')
 
 echo "rewrote $changed of $todo rows" >&2
+if [[ "$changed" -lt "$todo" ]]; then
+  echo "warning: $((todo - changed)) rows not rewritten; run the dry run again to see what is left" >&2
+  exit 1
+fi
