@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 import type { Env } from "../src/env";
+import { canonicalJson } from "../src/fingerprint";
 import worker, { QUARANTINE_MEMORY_MAX, resetQuarantineMemory } from "../src/index";
 import { gzip, mockEnv, payload, post } from "./helpers";
 
@@ -102,7 +103,7 @@ describe("POST /v1/event", () => {
       "0",
       "0",
       "0",
-      JSON.stringify(payload().config),
+      '{"formatter":"@graphql-markdown/docusaurus","schema":"<url>"}',
       "",
       "",
     ]);
@@ -307,6 +308,38 @@ describe("body bounds", () => {
     expect(res.status).toBe(204);
     expect(pulled.n).toBeLessThan(chunks.length - 900);
     expect(rejects.writeDataPoint.mock.calls[0][0].blobs).toEqual(["size"]);
+  });
+});
+
+describe("config JSON", () => {
+  it("stores the config with keys sorted at every level", async () => {
+    const { env, events } = mockEnv();
+    const config = {
+      schema: "<url>",
+      formatter: "@graphql-markdown/docusaurus",
+      docOptions: { index: true, frontMatter: false },
+    };
+    await worker.fetch(post(JSON.stringify(payload({ config })), JSON_HEADERS), env);
+    expect(events.writeDataPoint.mock.calls[0][0].blobs[17]).toBe(
+      '{"docOptions":{"frontMatter":false,"index":true},"formatter":"@graphql-markdown/docusaurus","schema":"<url>"}',
+    );
+  });
+
+  it("gives the same blob for the same config in any key order", async () => {
+    const blobOf = async (config: Record<string, unknown>) => {
+      const { env, events } = mockEnv();
+      await worker.fetch(post(JSON.stringify(payload({ config })), JSON_HEADERS), env);
+      return events.writeDataPoint.mock.calls[0][0].blobs[17];
+    };
+    const a = await blobOf({ schema: "<url>", docOptions: { index: true, frontMatter: false } });
+    const b = await blobOf({ docOptions: { frontMatter: false, index: true }, schema: "<url>" });
+    expect(b).toBe(a);
+  });
+});
+
+describe("canonicalJson", () => {
+  it("keeps array order and sorts the keys of objects inside arrays", () => {
+    expect(canonicalJson({ b: [{ z: 1, a: 2 }, 3], a: null })).toBe('{"a":null,"b":[{"a":2,"z":1},3]}');
   });
 });
 

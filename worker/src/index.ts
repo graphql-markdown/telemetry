@@ -2,7 +2,7 @@ import { verifyAccess } from "./access";
 import { sendAlert } from "./alert";
 import { readBody } from "./body";
 import type { Env, RejectReason } from "./env";
-import { fingerprints, formatterOf } from "./fingerprint";
+import { canonicalJson, fingerprints, formatterOf } from "./fingerprint";
 import { previousDay, rollupDay } from "./rollup";
 import { validate } from "./schema";
 import { handleStats } from "./stats";
@@ -27,7 +27,7 @@ const MAX_CONFIG_JSON = 3000;
  * Blob order of a `gqlmd_events` data point (index 0 first):
  * event, fp, fpShape, pkg, pkgVersion, formatter, loader kinds (comma-joined),
  * os, pm, nodeMajor, graphqlMajor, ci, ciProvider, trigger, container, wsl,
- * abuse state, sanitized config JSON, target (create preset, else ""; blob19),
+ * abuse state, sanitized config JSON (keys sorted at every level), target (create preset, else ""; blob19),
  * errorType (generate failures, else ""; blob20, the last free blob).
  * Booleans are "1" or "0". The abuse state (blob17) is "0" clean, "1"
  * quarantined (per-(fp, colo) quarantine or RL_HARD flood) or "2" colo-sampled
@@ -40,7 +40,7 @@ export const buildBlobs = (
   abuseState: AbuseState,
 ): string[] => {
   const loader = payload.loader;
-  const configJson = JSON.stringify(payload.config ?? {});
+  const configJson = canonicalJson(payload.config ?? {});
   return [
     String(payload.event),
     fp,

@@ -38,7 +38,7 @@ These hold in every change. Review them before merging anything that touches `wo
 - The Worker never reads, logs, hashes or stores the IP address, the User-Agent, or any request header except `Content-Type`, `Content-Encoding` and `Content-Length`.
 - The only other header read is the Access JWT, and only on `/v1/stats`. `request.cf.colo` is used in memory for rate limits and the quarantine key (KV, 1 h TTL), and is never stored.
 - No `console.log` of request data. `observability.enabled` is `false` in `worker/wrangler.jsonc`.
-- Only allowlisted payload fields are stored (`worker/src/schema.ts`). Reject counters carry the reason only.
+- Only allowlisted payload fields are stored (`worker/src/schema.ts`). Reject counters carry the reason only. The stored config (blob18 and `config_catalog.masked_config_json`) is canonical JSON: object keys sorted ascending at every level, array order kept.
 - The dashboard and public pages send a strict Content-Security-Policy (`default-src 'self'`, no inline script or style, `frame-ancestors 'none'`) and `Referrer-Policy: no-referrer`. uPlot is self-hosted in `dashboard/vendor/`. The dashboard gets the headers from `dashboard/_headers`. GitHub Pages cannot set headers, so the public page carries the policy in a `<meta>` tag in `public/index.html` (no `frame-ancestors`, which meta ignores).
 
 ## Queries
@@ -194,6 +194,19 @@ The script reads `d1_database_id` and `quarantine_kv_id` from the tofu output, w
 ### Deploy from CI
 
 The `deploy` job in `.github/workflows/ci.yml` runs steps 5 and 6 (`tofu plan`, `tofu apply` of that saved plan, then `scripts/deploy.sh`) with the secrets and variables from step 4. It never runs on its own: open Actions > CI > Run workflow on `main`. It waits for the typecheck, test and OpenTofu jobs, and writes the plan to the run summary. The apply does not pause for review; to require an approval before the job starts, add required reviewers to the `production` environment (Settings > Environments). The first setup (two applies around the Access toggle) is still done by hand.
+
+### Data migration: sorted config keys
+
+`config_catalog` rows written before the Worker sorted config keys can still hold keys in the client's order. The rollup rewrites a row when its shape is seen again. `scripts/migrate-config-order.sh` rewrites all the remaining rows in one pass. Run it after the Worker change is deployed:
+
+```sh
+export CLOUDFLARE_API_TOKEN=<token with D1 Edit>
+export CLOUDFLARE_ACCOUNT_ID=<account id>
+scripts/migrate-config-order.sh           # dry run: prints the planned rows, writes nothing
+scripts/migrate-config-order.sh --apply   # prints a Time Travel bookmark, then updates
+```
+
+Each update matches on the old value, so a row the rollup has already rewritten is skipped, and running the script again does nothing. To undo, run `wrangler d1 time-travel restore gqlmd-telemetry --bookmark <bookmark>`. Raw Analytics Engine rows cannot be rewritten. They keep the client order until they expire (about 90 days), and the rollup sorts them when it reads them.
 
 ### 7. Verify
 

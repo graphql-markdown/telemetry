@@ -243,6 +243,40 @@ describe("rollupDay", () => {
     ]);
   });
 
+  it("stores catalog configs with keys sorted at every level", async () => {
+    mockAe({
+      ...base,
+      catalog: [
+        {
+          fp_shape: "s1",
+          version: "1.0.0",
+          config: '{"schema":"<url>","docOptions":{"index":true,"frontMatter":false}}',
+          events: 20,
+          debounced: 6,
+        },
+      ],
+    });
+    await rollupDay(makeEnv(), DAY);
+    const row = await db.prepare("SELECT masked_config_json FROM config_catalog").first();
+    expect(row?.masked_config_json).toBe('{"docOptions":{"frontMatter":false,"index":true},"schema":"<url>"}');
+  });
+
+  it("rewrites an unsorted catalog config on the next rollup", async () => {
+    await db
+      .prepare(
+        `INSERT INTO config_catalog (fp_shape, masked_config_json, versions_seen, first_seen, last_seen, events, debounced_events, last_rolled_day)
+         VALUES ('s1', '{"schema":"<url>","mode":"group"}', '1.0.0', '2026-10-01', '2026-10-01', 5, 2, '2026-10-01')`,
+      )
+      .run();
+    mockAe({
+      ...base,
+      catalog: [{ fp_shape: "s1", version: "1.0.0", config: '{"schema":"<url>","mode":"group"}', events: 20, debounced: 6 }],
+    });
+    await rollupDay(makeEnv(), DAY);
+    const row = await db.prepare("SELECT masked_config_json, first_seen, events FROM config_catalog").first();
+    expect(row).toEqual({ masked_config_json: '{"mode":"group","schema":"<url>"}', first_seen: "2026-10-01", events: 25 });
+  });
+
   it("gives identical rows when run twice for the same day", async () => {
     mockAe(base);
     await rollupDay(makeEnv(), DAY);
