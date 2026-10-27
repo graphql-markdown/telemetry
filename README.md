@@ -195,6 +195,19 @@ The script reads `d1_database_id` and `quarantine_kv_id` from the tofu output, w
 
 The `deploy` job in `.github/workflows/ci.yml` runs steps 5 and 6 (`tofu plan`, `tofu apply` of that saved plan, then `scripts/deploy.sh`) with the secrets and variables from step 4. It never runs on its own: open Actions > CI > Run workflow on `main`. It waits for the typecheck, test and OpenTofu jobs, and writes the plan to the run summary. The apply does not pause for review; to require an approval before the job starts, add required reviewers to the `production` environment (Settings > Environments). The first setup (two applies around the Access toggle) is still done by hand.
 
+### Data migration: sorted config keys
+
+`config_catalog` rows written before the Worker sorted config keys can still hold keys in the client's order. The rollup rewrites a row when its shape is seen again. `scripts/migrate-config-order.sh` rewrites all the remaining rows in one pass. Run it after the Worker change is deployed:
+
+```sh
+export CLOUDFLARE_API_TOKEN=<token with D1 Edit>
+export CLOUDFLARE_ACCOUNT_ID=<account id>
+scripts/migrate-config-order.sh           # dry run: prints the planned rows, writes nothing
+scripts/migrate-config-order.sh --apply   # prints a Time Travel bookmark, then updates
+```
+
+Each update matches on the old value, so a row the rollup has already rewritten is skipped, and running the script again does nothing. To undo, run `wrangler d1 time-travel restore gqlmd-telemetry --bookmark <bookmark>`. Raw Analytics Engine rows cannot be rewritten. They keep the client order until they expire (about 90 days), and the rollup sorts them when it reads them.
+
 ### 7. Verify
 
 ```sh
