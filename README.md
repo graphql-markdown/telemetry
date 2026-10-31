@@ -70,7 +70,7 @@ Notes:
 - `pages`: required integer, 0 to 1,000,000. Stored in double2.
 - `errorType`: optional, failures only, stored in blob20. One anchored allowlist pattern (`ALLOWLIST.errorTypePattern`): `Error`, `TypeError`, `RangeError`, `SyntaxError`, `ReferenceError`, `GraphQLError`, `AggregateError`, `AbortError`, `SystemError` or `<custom-error>`, each with an optional `:E[A-Z]+` system code, or `<no-schema>`; any of them may be prefixed `post:`.
 
-The rollup fills `generate_daily` (runs, failures, weighted p50/p95 of pages and duration per version, trigger and ci) and `generate_errors_daily`. `GET /v1/stats/generate` serves them with the `n<5` rule applied to runs over the range.
+The rollup fills `generate_daily` (runs, failures, and weighted p50/p95 of pages and duration over successful runs, per version, trigger and ci) and `generate_errors_daily`. `GET /v1/stats/generate` serves them with the `n<5` rule applied to runs over the range. Its p50/p95 average the stored per-row percentiles, weighted by successful runs. That is an approximation that understates p95 when slow runs are concentrated in a few rows.
 
 ## Testing infrastructure
 

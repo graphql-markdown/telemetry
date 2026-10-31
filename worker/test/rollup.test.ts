@@ -18,7 +18,8 @@ const keyOf = (sql: string): string => {
   if (sql.includes("blob17 = '2'")) return `colo:${/SELECT (blob\d+) AS value/.exec(sql)?.[1]}`;
   if (sql.includes("AS fp_shape")) return "catalog";
   if (sql.includes("AS error_type")) return "generate_errors";
-  if (sql.includes("AS pages_p50")) return "generate";
+  if (sql.includes("AS pages_p50")) return "generate_quantiles";
+  if (sql.includes("AS failures")) return "generate";
   return /SELECT (blob\d+) AS value/.exec(sql)?.[1] ?? "unknown";
 };
 
@@ -379,25 +380,30 @@ describe("rollupDay", () => {
 
 describe("generate rollup", () => {
   const generateFixtures: Fixtures = {
-    generate: [
+    generate: [{ version: "1.0.0", trigger: "cli", ci: "1", runs: 40, failures: 4 }],
+    generate_quantiles: [
       {
-        version: "1.0.0", trigger: "cli", ci: "1", runs: 40, failures: 4,
+        version: "1.0.0", trigger: "cli", ci: "1",
         pages_p50: 10, pages_p95: 90, duration_p50: 1200, duration_p95: 8000,
       },
     ],
     generate_errors: [{ version: "1.0.0", error_type: "post:TypeError", runs: 4 }],
   };
 
-  it("queries clean generate events with weighted quantiles", async () => {
+  it("queries clean generate events, with weighted quantiles of successful runs", async () => {
     mockAe(generateFixtures);
     await rollupDay(makeEnv(), DAY);
+    const runs = sqls.find((q) => q.includes("AS failures")) ?? "";
+    expect(runs).toContain("blob1 = 'generate'");
+    expect(runs).toContain("blob17 = '0'");
+    expect(runs).toContain("sumIf(_sample_interval * double1, blob20 != '')");
     const sql = sqls.find((q) => q.includes("AS pages_p50")) ?? "";
     expect(sql).toContain("blob1 = 'generate'");
     expect(sql).toContain("blob17 = '0'");
+    expect(sql).toContain("blob20 = ''");
     // The AE SQL API rejects a Float64 weight in the weighted quantiles.
     expect(sql).toContain("quantileExactWeighted(0.95)(double3, toUInt32(_sample_interval * double1))");
     expect(sql).toContain("quantileExactWeighted(0.5)(double2, toUInt32(_sample_interval * double1))");
-    expect(sql).toContain("sumIf(_sample_interval * double1, blob20 != '')");
     const errors = sqls.find((q) => q.includes("AS error_type")) ?? "";
     expect(errors).toContain("blob20 != ''");
     expect(errors).toContain("blob17 = '0'");
@@ -428,19 +434,27 @@ describe("generate rollup", () => {
         { fp_shape: "s1", version: "1.2.3", config: "{}", events: 20, debounced: 6 },
         { fp_shape: "s1", version: "1.2.4", config: "{}", events: 10, debounced: 4 },
       ],
+      // 9 successful runs each: quantiles weigh equally although runs differ.
       generate: [
+        { version: "1.2.3", trigger: "cli", ci: "1", runs: 10, failures: 1 },
+        { version: "1.2.4", trigger: "cli", ci: "1", runs: 30, failures: 21 },
+        // Only failures: no quantile row, so no weight in the merge.
+        { version: "1.2.5", trigger: "cli", ci: "1", runs: 2, failures: 2 },
+      ],
+      generate_quantiles: [
         {
-          version: "1.2.3", trigger: "cli", ci: "1", runs: 10, failures: 1,
+          version: "1.2.3", trigger: "cli", ci: "1",
           pages_p50: 10, pages_p95: 100, duration_p50: 1000, duration_p95: 2000,
         },
         {
-          version: "1.2.4", trigger: "cli", ci: "1", runs: 30, failures: 3,
+          version: "1.2.4", trigger: "cli", ci: "1",
           pages_p50: 20, pages_p95: 200, duration_p50: 2000, duration_p95: 4000,
         },
       ],
       generate_errors: [
         { version: "1.2.3", error_type: "post:TypeError", runs: 1 },
-        { version: "1.2.4", error_type: "post:TypeError", runs: 3 },
+        { version: "1.2.4", error_type: "post:TypeError", runs: 21 },
+        { version: "1.2.5", error_type: "post:TypeError", runs: 2 },
       ],
     });
     await rollupDay(makeEnv(), DAY);
@@ -449,12 +463,12 @@ describe("generate rollup", () => {
     const daily = (await db.prepare("SELECT * FROM generate_daily").all()).results;
     expect(daily).toEqual([
       {
-        day: DAY, pkg_version: "1.2", trigger: "cli", ci: "1", runs: 40, failures: 4,
-        pages_p50: 17.5, pages_p95: 175, duration_p50: 1750, duration_p95: 3500,
+        day: DAY, pkg_version: "1.2", trigger: "cli", ci: "1", runs: 42, failures: 24,
+        pages_p50: 15, pages_p95: 150, duration_p50: 1500, duration_p95: 3000,
       },
     ]);
     const errors = (await db.prepare("SELECT * FROM generate_errors_daily").all()).results;
-    expect(errors).toEqual([{ day: DAY, pkg_version: "1.2", error_type: "post:TypeError", runs: 4 }]);
+    expect(errors).toEqual([{ day: DAY, pkg_version: "1.2", error_type: "post:TypeError", runs: 24 }]);
     const catalog = await db.prepare("SELECT versions_seen FROM config_catalog").first();
     expect(catalog).toEqual({ versions_seen: "1.2" });
   });

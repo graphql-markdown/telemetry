@@ -238,7 +238,7 @@
       if (data.errors.length) {
         section.appendChild(details("Top error types", bars(data.errors.map(function (e) { return { value: e.error_type, n: e.runs }; }), function (v) { return v; })));
       }
-      section.appendChild(el("p", "Percentiles are run-weighted averages of daily values.", "note"));
+      section.appendChild(el("p", "Successful runs only. Percentiles are approximate: run-weighted averages of per-day, per-version, per-trigger, per-CI percentiles, which understate p95 when slow runs are concentrated.", "note"));
     }
     section.appendChild(suppressedNote(data.suppressed_count));
   }

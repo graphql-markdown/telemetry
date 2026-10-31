@@ -199,21 +199,24 @@ const rejects = async (env: Env, params: URLSearchParams): Promise<Response> => 
   });
 };
 
-/** Run-weighted mean of a quantile column. */
-const weighted = (rows: Array<{ runs: number } & Record<string, number>>, key: string): number | null => {
+/** Mean of a quantile column weighted by successful runs. */
+const weighted = (
+  rows: Array<{ runs: number; failures: number } & Record<string, number>>,
+  key: string,
+): number | null => {
   let sum = 0;
   let weight = 0;
   for (const row of rows) {
-    sum += row[key] * row.runs;
-    weight += row.runs;
+    sum += row[key] * (row.runs - row.failures);
+    weight += row.runs - row.failures;
   }
   return weight === 0 ? null : Math.round(sum / weight);
 };
 
 /**
  * Generate stats over the range: failure rate by version, top error types and
- * run-weighted p50/p95 of duration and pages (an approximation of the true
- * quantiles). Versions, error types and the quantiles are hidden when their
+ * p50/p95 of duration and pages over successful runs (per-row quantiles
+ * averaged by successful runs, an approximation of the true quantiles). Versions, error types and the quantiles are hidden when their
  * summed runs over the range are under MIN_COUNT.
  */
 const generate = async (env: Env, params: URLSearchParams): Promise<Response> => {
@@ -224,18 +227,16 @@ const generate = async (env: Env, params: URLSearchParams): Promise<Response> =>
   const { from, to } = range.value;
   const [ciA, ciB] = ciOf(view);
   const { results } = await env.DB.prepare(
-    `SELECT pkg_version, SUM(runs) AS runs, SUM(failures) AS failures,
-       SUM(pages_p50 * runs) / SUM(runs) AS pages_p50, SUM(pages_p95 * runs) / SUM(runs) AS pages_p95,
-       SUM(duration_p50 * runs) / SUM(runs) AS duration_p50, SUM(duration_p95 * runs) / SUM(runs) AS duration_p95
+    `SELECT pkg_version, SUM(runs) AS runs, SUM(failures) AS failures
      FROM generate_daily WHERE day BETWEEN ?1 AND ?2 AND ci IN (?3, ?4) GROUP BY pkg_version`,
   )
     .bind(from, to, ciA, ciB)
-    .all<{ pkg_version: string; runs: number; failures: number; pages_p50: number; pages_p95: number; duration_p50: number; duration_p95: number }>();
+    .all<{ pkg_version: string; runs: number; failures: number }>();
   const all = await env.DB.prepare(
-    "SELECT runs, pages_p50, pages_p95, duration_p50, duration_p95 FROM generate_daily WHERE day BETWEEN ?1 AND ?2 AND ci IN (?3, ?4)",
+    "SELECT runs, failures, pages_p50, pages_p95, duration_p50, duration_p95 FROM generate_daily WHERE day BETWEEN ?1 AND ?2 AND ci IN (?3, ?4)",
   )
     .bind(from, to, ciA, ciB)
-    .all<{ runs: number; pages_p50: number; pages_p95: number; duration_p50: number; duration_p95: number }>();
+    .all<{ runs: number; failures: number; pages_p50: number; pages_p95: number; duration_p50: number; duration_p95: number }>();
   const errors = await env.DB.prepare(
     `SELECT error_type, SUM(runs) AS runs FROM generate_errors_daily WHERE day BETWEEN ?1 AND ?2
      GROUP BY error_type ORDER BY runs DESC`,
