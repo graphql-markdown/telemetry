@@ -208,7 +208,7 @@ describe("GET /v1/stats/generate", () => {
     await db.batch([
       run("2026-10-05", "1.0.0", 3, 1),
       run("2026-10-06", "1.0.0", 3, 1),
-      run("2026-10-06", "2.0.0", 4, 4),
+      run("2026-10-06", "2.0.0", 4, 3),
       error("2026-10-05", "1.0.0", "Error", 3),
       error("2026-10-06", "1.0.0", "Error", 3),
       error("2026-10-06", "2.0.0", "TypeError", 4),
@@ -237,6 +237,16 @@ describe("GET /v1/stats/generate", () => {
     expect(body.runs).toBe(45);
     expect(body.duration_p50).toBe(1500);
     expect(body.pages_p95).toBe(1500);
+  });
+
+  it("hides the quantiles when successful runs are under 5, even with 5 runs", async () => {
+    await db.batch([run("2026-10-05", "1.0.0", 5, 4)]);
+    const body = (await (await get(`/v1/stats/generate?${Q}`, token)).json()) as any;
+    expect(body.runs).toBe(5);
+    expect(body.duration_p50).toBeNull();
+    expect(body.duration_p95).toBeNull();
+    expect(body.pages_p50).toBeNull();
+    expect(body.pages_p95).toBeNull();
   });
 
   it("hides the quantiles when the total is under 5, and filters by view", async () => {
