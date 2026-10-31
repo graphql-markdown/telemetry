@@ -216,8 +216,9 @@ const weighted = (
 /**
  * Generate stats over the range: failure rate by version, top error types and
  * p50/p95 of duration and pages over successful runs (per-row quantiles
- * averaged by successful runs, an approximation of the true quantiles). Versions, error types and the quantiles are hidden when their
- * summed runs over the range are under MIN_COUNT.
+ * averaged by successful runs, an approximation of the true quantiles).
+ * Versions and error types are hidden when their summed runs over the range
+ * are under MIN_COUNT, and the quantiles when the summed successful runs are.
  */
 const generate = async (env: Env, params: URLSearchParams): Promise<Response> => {
   const range = parseRange(params);
@@ -246,16 +247,19 @@ const generate = async (env: Env, params: URLSearchParams): Promise<Response> =>
   const shown = results.filter((row) => row.runs >= MIN_COUNT);
   const total = results.reduce((sum, row) => sum + row.runs, 0);
   const visible = total >= MIN_COUNT;
+  // The quantiles describe successful runs only, so gate them on that population.
+  const successes = results.reduce((sum, row) => sum + row.runs - row.failures, 0);
+  const quantilesVisible = successes >= MIN_COUNT;
   const shownErrors = errors.results.filter((row) => row.runs >= MIN_COUNT);
   return json({
     from,
     to,
     view,
     runs: visible ? total : null,
-    duration_p50: visible ? weighted(all.results, "duration_p50") : null,
-    duration_p95: visible ? weighted(all.results, "duration_p95") : null,
-    pages_p50: visible ? weighted(all.results, "pages_p50") : null,
-    pages_p95: visible ? weighted(all.results, "pages_p95") : null,
+    duration_p50: quantilesVisible ? weighted(all.results, "duration_p50") : null,
+    duration_p95: quantilesVisible ? weighted(all.results, "duration_p95") : null,
+    pages_p50: quantilesVisible ? weighted(all.results, "pages_p50") : null,
+    pages_p95: quantilesVisible ? weighted(all.results, "pages_p95") : null,
     versions: shown.map((row) => ({
       version: row.pkg_version,
       runs: row.runs,
