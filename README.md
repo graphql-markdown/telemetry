@@ -20,7 +20,7 @@ No personal data is collected or stored: there are no identifiers, and no IP add
    │
    │  daily cron 02:00 UTC: roll up day D-1 from Analytics Engine
    ▼
- D1  gqlmd-telemetry   daily_counts, config_catalog, config_catalog_daily, rejects_daily, generate_daily, generate_errors_daily (unlimited history)
+ D1  gqlmd-telemetry   daily_counts, config_catalog, config_catalog_daily, rejects_daily, generate_daily, generate_errors_ci_daily (unlimited history)
    │
    ├──► GET /v1/stats (and /catalog, /rejects, /generate)   JSON, Access JWT verified by the Worker
    └──► GET /           static dashboard
@@ -70,7 +70,7 @@ Notes:
 - `pages`: required integer, 0 to 1,000,000. Stored in double2.
 - `errorType`: optional, failures only, stored in blob20. One anchored allowlist pattern (`ALLOWLIST.errorTypePattern`): `Error`, `TypeError`, `RangeError`, `SyntaxError`, `ReferenceError`, `GraphQLError`, `AggregateError`, `AbortError`, `SystemError` or `<custom-error>`, each with an optional `:E[A-Z]+` system code, or `<no-schema>`; any of them may be prefixed `post:`.
 
-The rollup fills `generate_daily` (runs, failures, and weighted p50/p95 of pages and duration over successful runs, per version, trigger and ci) and `generate_errors_daily`. `GET /v1/stats/generate` serves them with the `n<5` rule applied to runs over the range. Its p50/p95 average the stored per-row percentiles, weighted by successful runs. That is an approximation that understates p95 when slow runs are concentrated in a few rows.
+The rollup fills `generate_daily` (runs, failures, and weighted p50/p95 of pages and duration over successful runs, per version, trigger and ci) and `generate_errors_ci_daily` (error runs per version, ci and error type). `GET /v1/stats/generate` serves them with the `n<5` rule applied to runs over the range. Its p50/p95 average the stored per-row percentiles, weighted by successful runs. That is an approximation that understates p95 when slow runs are concentrated in a few rows. Top error types follow the view; rows from before migration 0006 have an unknown ci (`''`) and count only in All.
 
 ## Testing infrastructure
 
@@ -210,6 +210,10 @@ The script reads `d1_database_id` and `quarantine_kv_id` from the tofu output, w
 Analytics Engine raw rows keep full versions until the 90-day retention expires. Only the rollup reads them, and it truncates.
 
 Deploy the Worker before releasing a client that sends major.minor. The previous Worker maps `1.2` to `unknown-value`.
+
+#### Migration 0006 (generate errors by ci)
+
+`migrations/0006_generate_errors_ci.sql` moves `generate_errors_daily` to `generate_errors_ci_daily`, which adds a `ci` column so the top error types can be filtered by view. Existing rows get `ci = ''` (unknown) and count only in the All view. Rolling a day up again replaces them with rows split by ci. Raw generate events are all still inside the Analytics Engine retention.
 
 ### Deploy from CI
 

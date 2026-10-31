@@ -124,9 +124,9 @@ const generateQuantilesSql = (day: string): string => {
 
 const generateErrorsSql = (day: string): string => {
   return (
-    `SELECT blob5 AS version, blob20 AS error_type, SUM(_sample_interval * double1) AS runs ` +
+    `SELECT blob5 AS version, blob12 AS ci, blob20 AS error_type, SUM(_sample_interval * double1) AS runs ` +
     `FROM gqlmd_events WHERE ${dayWindow(day)} AND ${CLEAN} AND blob1 = 'generate' ` +
-    `AND blob20 != '' GROUP BY version, error_type`
+    `AND blob20 != '' GROUP BY version, ci, error_type`
   );
 };
 
@@ -356,7 +356,7 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
   );
   const generateErrors = mergeRows(
     await query(env, generateErrorsSql(day)),
-    ["version", "error_type"],
+    ["version", "ci", "error_type"],
     ["runs"],
   );
 
@@ -393,7 +393,7 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
     db.prepare("DELETE FROM rejects_daily WHERE day = ?").bind(day),
     db.prepare("DELETE FROM config_catalog_daily WHERE day = ?").bind(day),
     db.prepare("DELETE FROM generate_daily WHERE day = ?").bind(day),
-    db.prepare("DELETE FROM generate_errors_daily WHERE day = ?").bind(day),
+    db.prepare("DELETE FROM generate_errors_ci_daily WHERE day = ?").bind(day),
   ];
   const keptDaily = [...dailyShapes]
     .sort((a, b) => b[1].events - a[1].events)
@@ -448,9 +448,9 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
     statements.push(
       db
         .prepare(
-          "INSERT INTO generate_errors_daily (day, pkg_version, error_type, runs) VALUES (?, ?, ?, ?)",
+          "INSERT INTO generate_errors_ci_daily (day, pkg_version, ci, error_type, runs) VALUES (?, ?, ?, ?, ?)",
         )
-        .bind(day, String(row.version), String(row.error_type), Number(row.runs)),
+        .bind(day, String(row.version), String(row.ci), String(row.error_type), Number(row.runs)),
     );
   }
   // Additive upsert, applied once per day: the WHERE skips a day that was
