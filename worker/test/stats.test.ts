@@ -222,6 +222,23 @@ describe("GET /v1/stats/generate", () => {
     expect(body.pages_p95).toBe(100);
   });
 
+  it("weights the quantiles by successful runs", async () => {
+    const quantiles = (version: string, runs: number, failures: number, p50: number) =>
+      db
+        .prepare("INSERT INTO generate_daily VALUES ('2026-10-05', ?, 'cli', '0', ?, ?, ?, ?, ?, ?)")
+        .bind(version, runs, failures, p50, p50, p50, p50);
+    // Runs-weighted would give (10*1000 + 30*2000) / 40 = 1750; successes 9 and 9 give 1500.
+    await db.batch([
+      quantiles("1.0", 10, 1, 1000),
+      quantiles("1.1", 30, 21, 2000),
+      quantiles("1.2", 5, 5, 0),
+    ]);
+    const body = (await (await get(`/v1/stats/generate?${Q}`, token)).json()) as any;
+    expect(body.runs).toBe(45);
+    expect(body.duration_p50).toBe(1500);
+    expect(body.pages_p95).toBe(1500);
+  });
+
   it("hides the quantiles when the total is under 5, and filters by view", async () => {
     await db.batch([run("2026-10-05", "1.0.0", 4, 0), run("2026-10-05", "1.0.0", 9, 0, "1")]);
     const local = (await (await get(`/v1/stats/generate?${Q}`, token)).json()) as any;

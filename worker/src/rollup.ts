@@ -95,18 +95,30 @@ const catalogSql = (day: string): string => {
   );
 };
 
-/** Generate runs per version, trigger and ci, with failures and quantiles. */
+/** Generate runs and failures per version, trigger and ci. */
 const generateSql = (day: string): string => {
   return (
     `SELECT blob5 AS version, blob14 AS trigger, blob12 AS ci, ` +
     `SUM(_sample_interval * double1) AS runs, ` +
-    `sumIf(_sample_interval * double1, blob20 != '') AS failures, ` +
+    `sumIf(_sample_interval * double1, blob20 != '') AS failures ` +
+    `FROM gqlmd_events WHERE ${dayWindow(day)} AND ${CLEAN} AND blob1 = 'generate' ` +
+    `GROUP BY version, trigger, ci`
+  );
+};
+
+/**
+ * Quantiles of successful generate runs only: a failed run stops early, so its
+ * pages and duration would drag the percentiles down.
+ */
+const generateQuantilesSql = (day: string): string => {
+  return (
+    `SELECT blob5 AS version, blob14 AS trigger, blob12 AS ci, ` +
     `quantileExactWeighted(0.5)(double2, ${WEIGHT}) AS pages_p50, ` +
     `quantileExactWeighted(0.95)(double2, ${WEIGHT}) AS pages_p95, ` +
     `quantileExactWeighted(0.5)(double3, ${WEIGHT}) AS duration_p50, ` +
     `quantileExactWeighted(0.95)(double3, ${WEIGHT}) AS duration_p95 ` +
     `FROM gqlmd_events WHERE ${dayWindow(day)} AND ${CLEAN} AND blob1 = 'generate' ` +
-    `GROUP BY version, trigger, ci`
+    `AND blob20 = '' GROUP BY version, trigger, ci`
   );
 };
 
@@ -209,7 +221,8 @@ const QUANTILES = ["pages_p50", "pages_p95", "duration_p50", "duration_p95"] as 
 
 /**
  * Truncate each row's version and merge rows that now share a key: `sum`
- * columns are added, quantiles are run-weighted averages (max when no runs).
+ * columns are added, quantiles are averages weighted by successful runs
+ * (runs - failures; max when none).
  */
 const mergeRows = (
   rows: Row[],
@@ -228,11 +241,12 @@ const mergeRows = (
     for (const column of sum) {
       out[column] = group.reduce((total, row) => total + Number(row[column] ?? 0), 0);
     }
-    const runs = group.reduce((total, row) => total + Number(row.runs), 0);
+    const ok = (row: Row): number => Number(row.runs) - Number(row.failures ?? 0);
+    const runs = group.reduce((total, row) => total + ok(row), 0);
     for (const q of quantiles) {
       out[q] =
         runs > 0
-          ? group.reduce((total, row) => total + Number(row[q] ?? 0) * Number(row.runs), 0) / runs
+          ? group.reduce((total, row) => total + Number(row[q] ?? 0) * ok(row), 0) / runs
           : Math.max(...group.map((row) => Number(row[q] ?? 0)));
     }
     return out;
@@ -327,8 +341,15 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
     shapes.set(id, shape);
   }
   const rejects = await query(env, rejectsSql(day));
+  const successQuantiles = new Map<string, Row>();
+  for (const row of await query(env, generateQuantilesSql(day))) {
+    successQuantiles.set([row.version, row.trigger, row.ci].join(KEY_SEP), row);
+  }
   const generateRows = mergeRows(
-    await query(env, generateSql(day)),
+    (await query(env, generateSql(day))).map((row) => {
+      const q = successQuantiles.get([row.version, row.trigger, row.ci].join(KEY_SEP));
+      return { ...row, ...Object.fromEntries(QUANTILES.map((c) => [c, Number(q?.[c] ?? 0)])) };
+    }),
     ["version", "trigger", "ci"],
     ["runs", "failures"],
     QUANTILES,
