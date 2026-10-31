@@ -51,7 +51,8 @@ Ad-hoc questions go through `scripts/query.sh`:
 # Needs CF_ACCOUNT_ID and CF_API_TOKEN (Account Analytics Read).
 scripts/query.sh ae "SELECT blob6 AS formatter, SUM(_sample_interval * double1) AS events FROM gqlmd_events WHERE timestamp > NOW() - INTERVAL '7' DAY GROUP BY formatter"
 
-# D1 rollups (unlimited history), through wrangler.
+# D1 rollups (unlimited history), through the D1 API.
+# Needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN (D1 Read, or D1 Edit for writes).
 scripts/query.sh d1 "SELECT day, SUM(n) FROM daily_counts GROUP BY day ORDER BY day DESC LIMIT 7"
 ```
 
@@ -217,11 +218,11 @@ Deploy the Worker before releasing a client that sends major.minor. The previous
 
 #### Backfill
 
-Re-roll past days from Analytics Engine, for example after a rollup change. `scripts/backfill.sh FROM [TO]` queues days in the D1 table `rollup_backfill` (migration 0007), through the same wrangler path as `scripts/query.sh d1`. The ingest Worker's backfill cron (`5,15,25,35,45,55 * * * *`) rolls up the oldest queued day each tick, so 30 days take about 5 hours. There is no HTTP endpoint for it.
+Re-roll past days from Analytics Engine, for example after a rollup change. `scripts/backfill.sh FROM [TO]` queues days in the D1 table `rollup_backfill` (migration 0007), through `scripts/query.sh d1` (D1 API, database looked up by name). The ingest Worker's backfill cron (`5,15,25,35,45,55 * * * *`) rolls up the oldest queued day each tick, so 30 days take about 5 hours. There is no HTTP endpoint for it.
 
 ```sh
 scripts/backfill.sh --dry-run 2026-10-12 2026-10-30   # print the SQL only
-scripts/backfill.sh 2026-10-12 2026-10-30             # queue (CLOUDFLARE_API_TOKEN with D1 Edit)
+scripts/backfill.sh 2026-10-12 2026-10-30             # queue (CLOUDFLARE_API_TOKEN with D1 Edit, CLOUDFLARE_ACCOUNT_ID)
 scripts/backfill.sh --status                          # what is left
 ```
 
