@@ -49,14 +49,17 @@ export const gzip = async (text: string): Promise<Uint8Array> => {
   return new Uint8Array(await new Response(stream).arrayBuffer());
 };
 
-/** Apply the D1 migration to the (empty) test database. */
-export const applyMigrations = async (db: D1Database): Promise<void> => {
+/** Apply the D1 migrations to the (empty) test database, optionally only the first `upTo`. */
+export const applyMigrations = async (db: D1Database, upTo = 5, from = 1): Promise<void> => {
   const sql = [
     (await import("../../migrations/0001_init.sql?raw")).default,
     (await import("../../migrations/0002_ci_split.sql?raw")).default,
     (await import("../../migrations/0003_catalog_daily.sql?raw")).default,
     (await import("../../migrations/0004_generate_daily.sql?raw")).default,
-  ].join("\n");
+    (await import("../../migrations/0005_truncate_pkg_version.sql?raw")).default,
+  ]
+    .slice(from - 1, upTo)
+    .join("\n");
   const statements = sql
     .replace(/^--.*$/gm, "")
     .split(";")

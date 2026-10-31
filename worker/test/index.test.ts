@@ -90,7 +90,7 @@ describe("POST /v1/event", () => {
     expect(blobs[2]).toMatch(/^[0-9a-f]{64}$/);
     expect(blobs.slice(3)).toEqual([
       "@graphql-markdown/cli",
-      "1.2.3",
+      "1.2",
       "@graphql-markdown/docusaurus",
       "url",
       "darwin",
@@ -535,13 +535,13 @@ describe("anti-abuse", () => {
   it("bounds the in-memory map", async () => {
     const { env } = mockEnv({ RL: limiter(false), RL_HARD: limiter(true) } as Partial<Env>);
     for (let i = 0; i < QUARANTINE_MEMORY_MAX + 5; i += 1) {
-      await send(env, { pkgVersion: `1.0.${i}` });
+      await send(env, { pkgVersion: `${Math.floor(i / 1000)}.${i % 1000}` });
     }
     // The oldest entry was evicted, so with RL calm it is no longer flagged.
     const calm = mockEnv({ RL: limiter(true), RL_HARD: limiter(true) } as Partial<Env>);
-    await send(calm.env, { pkgVersion: "1.0.0" });
+    await send(calm.env, { pkgVersion: "0.0" });
     expect(quarantinedBlob(calm.events)).toBe("0");
-    await send(calm.env, { pkgVersion: `1.0.${QUARANTINE_MEMORY_MAX + 4}` });
+    await send(calm.env, { pkgVersion: `${Math.floor((QUARANTINE_MEMORY_MAX + 4) / 1000)}.${(QUARANTINE_MEMORY_MAX + 4) % 1000}` });
     expect(quarantinedBlob(calm.events, 1)).toBe("1");
   });
 
@@ -589,7 +589,7 @@ describe("per-colo limit", () => {
     const total = 5000;
     for (let i = 0; i < total; i += 1) {
       await worker.fetch(
-        post(JSON.stringify(payload({ pkgVersion: `1.0.${i}` })), JSON_HEADERS, { cf: { colo: "LHR" } }),
+        post(JSON.stringify(payload({ pkgVersion: `${Math.floor(i / 1000)}.${i % 1000}` })), JSON_HEADERS, { cf: { colo: "LHR" } }),
         env,
       );
     }
