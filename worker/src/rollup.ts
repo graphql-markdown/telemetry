@@ -1,6 +1,6 @@
 import type { Env } from "./env";
 import { canonicalJson } from "./fingerprint";
-import { VALUE_STRINGS } from "./schema";
+import { truncateVersion, VALUE_STRINGS } from "./schema";
 
 /** At most this many `daily_counts` rows (and catalog rows) are written per day. */
 export const MAX_ROWS_PER_DAY = 2000;
@@ -196,7 +196,7 @@ type Shape = {
 };
 
 const mergeVersions = (previous: string, added: Iterable<string>): string => {
-  const all = new Set(previous === "" ? [] : previous.split(","));
+  const all = new Set(previous === "" ? [] : previous.split(",").map(truncateVersion));
   for (const version of added) {
     all.add(version);
   }
@@ -204,6 +204,40 @@ const mergeVersions = (previous: string, added: Iterable<string>): string => {
 };
 
 const CHUNK = 50;
+
+const QUANTILES = ["pages_p50", "pages_p95", "duration_p50", "duration_p95"] as const;
+
+/**
+ * Truncate each row's version and merge rows that now share a key: `sum`
+ * columns are added, quantiles are run-weighted averages (max when no runs).
+ */
+const mergeRows = (
+  rows: Row[],
+  keys: string[],
+  sum: string[],
+  quantiles: readonly string[] = [],
+): Row[] => {
+  const groups = new Map<string, Row[]>();
+  for (const row of rows) {
+    const next: Row = { ...row, version: truncateVersion(row.version) };
+    const key = keys.map((k) => String(next[k])).join(KEY_SEP);
+    groups.set(key, [...(groups.get(key) ?? []), next]);
+  }
+  return [...groups.values()].map((group) => {
+    const out: Row = { ...group[0] };
+    for (const column of sum) {
+      out[column] = group.reduce((total, row) => total + Number(row[column] ?? 0), 0);
+    }
+    const runs = group.reduce((total, row) => total + Number(row.runs), 0);
+    for (const q of quantiles) {
+      out[q] =
+        runs > 0
+          ? group.reduce((total, row) => total + Number(row[q] ?? 0) * Number(row.runs), 0) / runs
+          : Math.max(...group.map((row) => Number(row[q] ?? 0)));
+    }
+    return out;
+  });
+};
 
 /**
  * Roll up one UTC day from Analytics Engine into D1. Idempotent: the day's
@@ -217,14 +251,14 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
 
   for (const [dim, column, extra = ""] of BLOB_DIMS) {
     for (const row of await query(env, dimSql(column, day, extra))) {
-      const value = String(row.value);
+      const value = dim === "pkgVersion" ? truncateVersion(row.value) : String(row.value);
       addMeasures(counts, dim, value, row);
       if (dim === "event" && value === "config") {
         configEvents += Number(row.raw ?? 0);
       }
     }
     for (const row of await query(env, coloSql(column, day, extra))) {
-      addColo(counts, dim, String(row.value), row);
+      addColo(counts, dim, dim === "pkgVersion" ? truncateVersion(row.value) : String(row.value), row);
       if (dim === "event" && String(row.value) === "config") {
         configEvents += Number(row.colo_sampled ?? 0);
       }
@@ -287,14 +321,23 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
     daily.events += Number(row.events);
     daily.debounced += Number(row.debounced);
     dailyShapes.set(dailyKey, daily);
-    shape.versions.add(String(row.version));
+    shape.versions.add(truncateVersion(row.version));
     shape.events += Number(row.events);
     shape.debounced += Number(row.debounced);
     shapes.set(id, shape);
   }
   const rejects = await query(env, rejectsSql(day));
-  const generateRows = await query(env, generateSql(day));
-  const generateErrors = await query(env, generateErrorsSql(day));
+  const generateRows = mergeRows(
+    await query(env, generateSql(day)),
+    ["version", "trigger", "ci"],
+    ["runs", "failures"],
+    QUANTILES,
+  );
+  const generateErrors = mergeRows(
+    await query(env, generateErrorsSql(day)),
+    ["version", "error_type"],
+    ["runs"],
+  );
 
   // Cardinality guard: keep the largest rows.
   const rows: CountRow[] = [...counts].map(([key, n]) => {

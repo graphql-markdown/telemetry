@@ -201,30 +201,22 @@ const PACKAGE_NAMES: ReadonlySet<string> = new Set([
   ...FORMATTER_PRESETS.map((name) => `@graphql-markdown/formatters/${name}`),
 ]);
 const PRE_TAGS = "alpha|beta|rc|canary|next";
-const VERSION_EXACT = new RegExp(
-  `^\\d{1,4}\\.\\d{1,4}\\.\\d{1,4}(-(${PRE_TAGS})\\.\\d{1,3})?$`,
-);
 const VERSION_LOOSE = new RegExp(
-  `^(\\d{1,4}\\.\\d{1,4}\\.\\d{1,4})(?:-(${PRE_TAGS})(?:\\.(\\d{1,3}))?(?![0-9A-Za-z]))?`,
+  `^(\\d{1,4}\\.\\d{1,4})(\\.\\d{1,4})?(?:-(${PRE_TAGS})(?:\\.\\d{1,3})?(?![0-9A-Za-z]))?`,
 );
 const MAX_ITEMS = 50;
 const MAX_INT = 1000;
 
-/** Closed-set version: exact, else normalised, else `unknown-value`. */
-const normaliseVersion = (value: unknown): string => {
+/** Closed-set version truncated to major.minor (patch and prerelease dropped), else `unknown-value`. */
+export const truncateVersion = (value: unknown): string => {
   if (typeof value !== "string") {
     return UNKNOWN_VALUE;
   }
-  if (VERSION_EXACT.test(value)) {
-    return value;
-  }
   const match = VERSION_LOOSE.exec(value);
-  if (match === null || (match[2] === undefined && value !== match[1])) {
+  if (match === null || (match[3] === undefined && value !== `${match[1]}${match[2] ?? ""}`)) {
     return UNKNOWN_VALUE;
   }
-  return match[2] === undefined
-    ? match[1]
-    : `${match[1]}-${match[2]}.${match[3] ?? "0"}`;
+  return match[1];
 };
 
 const inRange = (value: unknown, min: number, max: number): boolean => {
@@ -501,7 +493,7 @@ export const validate = (payload: unknown): ValidationResult => {
   }
   out.pkg = PACKAGE_NAMES.has(payload.pkg) ? payload.pkg : UNKNOWN_VALUE;
 
-  out.pkgVersion = normaliseVersion(payload.pkgVersion);
+  out.pkgVersion = truncateVersion(payload.pkgVersion);
 
   out.nodeMajor = inRange(payload.nodeMajor, 18, 40)
     ? payload.nodeMajor

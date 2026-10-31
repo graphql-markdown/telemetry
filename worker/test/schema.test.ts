@@ -6,7 +6,7 @@ const base = () => ({
   v: 1,
   event: "config",
   pkg: "@graphql-markdown/cli",
-  pkgVersion: "0.1.0",
+  pkgVersion: "0.1",
   nodeMajor: 24,
   graphqlMajor: 16,
   os: "darwin",
@@ -274,15 +274,18 @@ describe("validate: key allowlist", () => {
 
 describe("validate: closed sets for free-text channels", () => {
   it.each([
-    ["1.2.3", "1.2.3"],
-    ["1.2.3-rc.1", "1.2.3-rc.1"],
-    ["1.2.3-beta.4-my-secret-branch", "1.2.3-beta.4"],
-    ["1.2.3-beta-secret", "1.2.3-beta.0"],
+    ["1.2.3", "1.2"],
+    ["1.2", "1.2"],
+    ["1.2-rc", "1.2"],
+    ["1.2.3-rc.1", "1.2"],
+    ["1.2.3-beta.4-my-secret-branch", "1.2"],
+    ["1.2.3-beta-secret", "1.2"],
     ["1.2.3-secretbranch.1", "unknown-value"],
     ["1.2.3+build.secret", "unknown-value"],
     ["latest", "unknown-value"],
     ["1.2.3/../x", "unknown-value"],
-    ["1.2", "unknown-value"],
+    ["1", "unknown-value"],
+    ["1.2.3.4", "unknown-value"],
   ])("normalises pkgVersion %s", (input, expected) => {
     expect(validate({ ...base(), pkgVersion: input })).toMatchObject({
       ok: true,

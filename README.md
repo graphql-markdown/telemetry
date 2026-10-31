@@ -39,6 +39,7 @@ These hold in every change. Review them before merging anything that touches `wo
 - The only other header read is the Access JWT, and only on `/v1/stats`. `request.cf.colo` is used in memory for rate limits and the quarantine key (KV, 1 h TTL), and is never stored.
 - No `console.log` of request data. `observability.enabled` is `false` in `worker/wrangler.jsonc`.
 - Only allowlisted payload fields are stored (`worker/src/schema.ts`). Reject counters carry the reason only. The stored config (blob18 and `config_catalog.masked_config_json`) is canonical JSON: object keys sorted ascending at every level, array order kept.
+- `pkgVersion` is stored as major.minor (`1.2.3` and `1.2.3-rc.1` both become `1.2`, anything else becomes `unknown-value`): the patch and prerelease are dropped. The rollup truncates the same way.
 - The dashboard and public pages send a strict Content-Security-Policy (`default-src 'self'`, no inline script or style, `frame-ancestors 'none'`) and `Referrer-Policy: no-referrer`. uPlot is self-hosted in `dashboard/vendor/`. The dashboard gets the headers from `dashboard/_headers`. GitHub Pages cannot set headers, so the public page carries the policy in a `<meta>` tag in `public/index.html` (no `frame-ancestors`, which meta ignores).
 
 ## Queries
@@ -191,6 +192,25 @@ scripts/deploy.sh
 
 The script reads `d1_database_id` and `quarantine_kv_id` from the tofu output, writes a temporary copy of `worker/wrangler.jsonc` with the real D1 and KV ids (and the same for `worker/wrangler.dashboard.jsonc`), runs `wrangler deploy` for both configs and `wrangler d1 migrations apply gqlmd-telemetry --remote` once, then deletes the copies. It needs `tofu` initialised in `infra/`. Run it again after each Worker change or new file in `migrations/`, or let CI do it (below).
 
+#### Migration 0005 (pkgVersion truncation)
+
+`migrations/0005_truncate_pkg_version.sql` rewrites existing data to major.minor (`daily_counts` pkgVersion values, `generate_daily`, `generate_errors_daily`, `config_catalog.versions_seen`), merging rows that collapse into one.
+
+1. Before deploying, note a restore point: `wrangler d1 time-travel info gqlmd-telemetry`. Rollback: `wrangler d1 time-travel restore gqlmd-telemetry --bookmark <bookmark>`.
+2. Deploy (CI or `scripts/deploy.sh`), which applies 0005.
+3. Check that no 3-part versions remain:
+
+   ```sh
+   wrangler d1 execute gqlmd-telemetry --remote --command "SELECT DISTINCT value FROM daily_counts WHERE dim='pkgVersion'"
+   wrangler d1 execute gqlmd-telemetry --remote --command "SELECT DISTINCT pkg_version FROM generate_daily"
+   ```
+
+4. Re-export the public stats (`scripts/export-public.sh`, or wait for the public-stats workflow).
+
+Analytics Engine raw rows keep full versions until the 90-day retention expires. Only the rollup reads them, and it truncates.
+
+Deploy the Worker before releasing a client that sends major.minor. The previous Worker maps `1.2` to `unknown-value`.
+
 ### Deploy from CI
 
 The `deploy` job in `.github/workflows/ci.yml` runs steps 5 and 6 (`tofu plan`, `tofu apply` of that saved plan, then `scripts/deploy.sh`) with the secrets and variables from step 4. It never runs on its own: open Actions > CI > Run workflow on `main`. It waits for the typecheck, test and OpenTofu jobs, and writes the plan to the run summary. The apply does not pause for review; to require an approval before the job starts, add required reviewers to the `production` environment (Settings > Environments). The first setup (two applies around the Access toggle) is still done by hand.
@@ -201,7 +221,7 @@ The `deploy` job in `.github/workflows/ci.yml` runs steps 5 and 6 (`tofu plan`, 
 # Expect HTTP 202
 curl -i -X POST https://gqlmd-telemetry.<sub>.workers.dev/v1/event \
   -H 'Content-Type: application/json' \
-  -d '{"v":1,"event":"config","pkg":"@graphql-markdown/cli","pkgVersion":"1.2.3","nodeMajor":24,"graphqlMajor":16,"os":"darwin","ci":false,"pm":"npm","firstRun":false,"trigger":"cli","container":false,"wsl":false,"loader":"url","config":{"schema":"<url>","formatter":"@graphql-markdown/docusaurus"}}'
+  -d '{"v":1,"event":"config","pkg":"@graphql-markdown/cli","pkgVersion":"1.2","nodeMajor":24,"graphqlMajor":16,"os":"darwin","ci":false,"pm":"npm","firstRun":false,"trigger":"cli","container":false,"wsl":false,"loader":"url","config":{"schema":"<url>","formatter":"@graphql-markdown/docusaurus"}}'
 
 # Expect HTTP 404 (stats are served by the dashboard Worker only)
 curl -i 'https://gqlmd-telemetry.<sub>.workers.dev/v1/stats?dim=os'

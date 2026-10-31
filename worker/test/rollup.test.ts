@@ -233,7 +233,7 @@ describe("rollupDay", () => {
       {
         fp_shape: "s1",
         masked_config_json: '{"schema":"<url>"}',
-        versions_seen: "1.0.0,1.1.0",
+        versions_seen: "1.0,1.1",
         first_seen: DAY,
         last_seen: DAY,
         events: 30,
@@ -337,7 +337,7 @@ describe("rollupDay", () => {
       debounced_1h: 1,
       debounced_1d: 1,
     }));
-    mockAe({ blob5: many });
+    mockAe({ blob8: many });
     await rollupDay(makeEnv(), DAY);
     const { results } = await db.prepare("SELECT n FROM daily_counts WHERE day = ?").bind(DAY).all<{ n: number }>();
     expect(results).toHaveLength(MAX_ROWS_PER_DAY);
@@ -410,12 +410,53 @@ describe("generate rollup", () => {
     const daily = (await db.prepare("SELECT * FROM generate_daily").all()).results;
     expect(daily).toEqual([
       {
-        day: DAY, pkg_version: "1.0.0", trigger: "cli", ci: "1", runs: 40, failures: 4,
+        day: DAY, pkg_version: "1.0", trigger: "cli", ci: "1", runs: 40, failures: 4,
         pages_p50: 10, pages_p95: 90, duration_p50: 1200, duration_p95: 8000,
       },
     ]);
     const errors = (await db.prepare("SELECT * FROM generate_errors_daily").all()).results;
-    expect(errors).toEqual([{ day: DAY, pkg_version: "1.0.0", error_type: "post:TypeError", runs: 4 }]);
+    expect(errors).toEqual([{ day: DAY, pkg_version: "1.0", error_type: "post:TypeError", runs: 4 }]);
+  });
+
+  it("merges patch versions into one major.minor row", async () => {
+    mockAe({
+      blob5: [
+        { value: "1.2.3", raw: 10, debounced_1h: 5, debounced_1d: 4 },
+        { value: "1.2.4", raw: 20, debounced_1h: 7, debounced_1d: 6 },
+      ],
+      catalog: [
+        { fp_shape: "s1", version: "1.2.3", config: "{}", events: 20, debounced: 6 },
+        { fp_shape: "s1", version: "1.2.4", config: "{}", events: 10, debounced: 4 },
+      ],
+      generate: [
+        {
+          version: "1.2.3", trigger: "cli", ci: "1", runs: 10, failures: 1,
+          pages_p50: 10, pages_p95: 100, duration_p50: 1000, duration_p95: 2000,
+        },
+        {
+          version: "1.2.4", trigger: "cli", ci: "1", runs: 30, failures: 3,
+          pages_p50: 20, pages_p95: 200, duration_p50: 2000, duration_p95: 4000,
+        },
+      ],
+      generate_errors: [
+        { version: "1.2.3", error_type: "post:TypeError", runs: 1 },
+        { version: "1.2.4", error_type: "post:TypeError", runs: 3 },
+      ],
+    });
+    await rollupDay(makeEnv(), DAY);
+    const versions = (await counts()).filter((r) => r.dim === "pkgVersion" && r.measure === "raw");
+    expect(versions).toEqual([{ ci: "0", dim: "pkgVersion", value: "1.2", measure: "raw", n: 30 }]);
+    const daily = (await db.prepare("SELECT * FROM generate_daily").all()).results;
+    expect(daily).toEqual([
+      {
+        day: DAY, pkg_version: "1.2", trigger: "cli", ci: "1", runs: 40, failures: 4,
+        pages_p50: 17.5, pages_p95: 175, duration_p50: 1750, duration_p95: 3500,
+      },
+    ]);
+    const errors = (await db.prepare("SELECT * FROM generate_errors_daily").all()).results;
+    expect(errors).toEqual([{ day: DAY, pkg_version: "1.2", error_type: "post:TypeError", runs: 4 }]);
+    const catalog = await db.prepare("SELECT versions_seen FROM config_catalog").first();
+    expect(catalog).toEqual({ versions_seen: "1.2" });
   });
 });
 
