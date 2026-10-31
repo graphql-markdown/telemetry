@@ -85,7 +85,10 @@ describe("migration 0005 truncate pkgVersion", () => {
 describe("migration 0006 split generate errors by ci", () => {
   it("keeps existing rows with an unknown ci and is idempotent", async () => {
     const db = (env as unknown as { DB: D1Database }).DB;
+    // Storage is shared across this file: start from empty error tables.
+    await db.prepare("DROP TABLE IF EXISTS generate_errors_ci_daily").run();
     await applyMigrations(db, 5);
+    await db.prepare("DELETE FROM generate_errors_daily").run();
     await db
       .prepare("INSERT INTO generate_errors_daily (day, pkg_version, error_type, runs) VALUES ('2026-01-01','1.2','E',3)")
       .run();
