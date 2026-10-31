@@ -50,7 +50,7 @@ export const gzip = async (text: string): Promise<Uint8Array> => {
 };
 
 /** Apply the D1 migrations to the (empty) test database, optionally only the first `upTo`. */
-export const applyMigrations = async (db: D1Database, upTo = 6, from = 1): Promise<void> => {
+export const applyMigrations = async (db: D1Database, upTo = 7, from = 1): Promise<void> => {
   const sql = [
     (await import("../../migrations/0001_init.sql?raw")).default,
     (await import("../../migrations/0002_ci_split.sql?raw")).default,
@@ -58,6 +58,7 @@ export const applyMigrations = async (db: D1Database, upTo = 6, from = 1): Promi
     (await import("../../migrations/0004_generate_daily.sql?raw")).default,
     (await import("../../migrations/0005_truncate_pkg_version.sql?raw")).default,
     (await import("../../migrations/0006_generate_errors_ci.sql?raw")).default,
+    (await import("../../migrations/0007_rollup_backfill.sql?raw")).default,
   ]
     .slice(from - 1, upTo)
     .join("\n");

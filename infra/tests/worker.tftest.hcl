@@ -130,6 +130,11 @@ run "cron" {
     condition     = cloudflare_workers_cron_trigger.rollup.schedules[0].cron == "0 2 * * *"
     error_message = "rollup cron must be 0 2 * * *"
   }
+
+  assert {
+    condition     = cloudflare_workers_cron_trigger.rollup.schedules[1].cron == "5,15,25,35,45,55 * * * *"
+    error_message = "backfill cron must match BACKFILL_CRON in worker/src/backfill.ts"
+  }
 }
 
 run "ae_sql_token_from_variable" {

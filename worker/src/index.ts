@@ -1,5 +1,6 @@
 import { verifyAccess } from "./access";
 import { sendAlert } from "./alert";
+import { BACKFILL_CRON, backfillTick } from "./backfill";
 import { readBody } from "./body";
 import type { Env, RejectReason } from "./env";
 import { canonicalJson, fingerprints, formatterOf } from "./fingerprint";
@@ -316,9 +317,16 @@ export default {
     }
     return ingest(request, env);
   },
-  /** Daily cron (0 2 * * *): roll up day D-1 (UTC) into D1, alert on failure or zero config events. */
+  /**
+   * Daily cron (0 2 * * *): roll up day D-1 (UTC) into D1, alert on failure or
+   * zero config events. Backfill cron: re-roll one day queued in rollup_backfill.
+   */
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     if (!serves(env, "ingest")) {
+      return;
+    }
+    if (controller.cron === BACKFILL_CRON) {
+      await backfillTick(env, controller.scheduledTime);
       return;
     }
     const day = previousDay(controller.scheduledTime);
