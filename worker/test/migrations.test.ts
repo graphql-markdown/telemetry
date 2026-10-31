@@ -12,7 +12,7 @@ describe("migrations", () => {
       .all<{ name: string }>();
     const names = results.map((row) => row.name);
     expect(names).toEqual(
-      expect.arrayContaining(["config_catalog", "daily_counts", "rejects_daily", "generate_daily", "generate_errors_daily"]),
+      expect.arrayContaining(["config_catalog", "daily_counts", "rejects_daily", "generate_daily", "generate_errors_ci_daily"]),
     );
   });
 
@@ -79,5 +79,25 @@ describe("migration 0005 truncate pkgVersion", () => {
     expect(first.cc).toEqual([{ versions_seen: "1.0,1.1" }]);
     await applyMigrations(db, 5, 5);
     expect(await read(db)).toEqual(first);
+  });
+});
+
+describe("migration 0006 split generate errors by ci", () => {
+  it("keeps existing rows with an unknown ci and is idempotent", async () => {
+    const db = (env as unknown as { DB: D1Database }).DB;
+    await applyMigrations(db, 5);
+    await db
+      .prepare("INSERT INTO generate_errors_daily (day, pkg_version, error_type, runs) VALUES ('2026-01-01','1.2','E',3)")
+      .run();
+    await applyMigrations(db, 6, 6);
+    const read = async () =>
+      (await db.prepare("SELECT day, pkg_version, ci, error_type, runs FROM generate_errors_ci_daily").all()).results;
+    expect(await read()).toEqual([{ day: "2026-01-01", pkg_version: "1.2", ci: "", error_type: "E", runs: 3 }]);
+    const old = await db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'generate_errors_daily'")
+      .first();
+    expect(old).toBeNull();
+    await applyMigrations(db);
+    expect(await read()).toEqual([{ day: "2026-01-01", pkg_version: "1.2", ci: "", error_type: "E", runs: 3 }]);
   });
 });

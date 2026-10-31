@@ -92,7 +92,7 @@ beforeEach(async () => {
     db.prepare("DELETE FROM rejects_daily"),
     db.prepare("DELETE FROM config_catalog_daily"),
     db.prepare("DELETE FROM generate_daily"),
-    db.prepare("DELETE FROM generate_errors_daily"),
+    db.prepare("DELETE FROM generate_errors_ci_daily"),
   ]);
 });
 
@@ -407,6 +407,7 @@ describe("generate rollup", () => {
     const errors = sqls.find((q) => q.includes("AS error_type")) ?? "";
     expect(errors).toContain("blob20 != ''");
     expect(errors).toContain("blob17 = '0'");
+    expect(errors).toContain("GROUP BY version, ci, error_type");
   });
 
   it("fills the generate tables idempotently", async () => {
@@ -420,8 +421,8 @@ describe("generate rollup", () => {
         pages_p50: 10, pages_p95: 90, duration_p50: 1200, duration_p95: 8000,
       },
     ]);
-    const errors = (await db.prepare("SELECT * FROM generate_errors_daily").all()).results;
-    expect(errors).toEqual([{ day: DAY, pkg_version: "1.0", error_type: "post:TypeError", runs: 4 }]);
+    const errors = (await db.prepare("SELECT * FROM generate_errors_ci_daily").all()).results;
+    expect(errors).toEqual([{ day: DAY, pkg_version: "1.0", ci: "0", error_type: "post:TypeError", runs: 4 }]);
   });
 
   it("merges patch versions into one major.minor row", async () => {
@@ -467,8 +468,8 @@ describe("generate rollup", () => {
         pages_p50: 15, pages_p95: 150, duration_p50: 1500, duration_p95: 3000,
       },
     ]);
-    const errors = (await db.prepare("SELECT * FROM generate_errors_daily").all()).results;
-    expect(errors).toEqual([{ day: DAY, pkg_version: "1.2", error_type: "post:TypeError", runs: 24 }]);
+    const errors = (await db.prepare("SELECT * FROM generate_errors_ci_daily").all()).results;
+    expect(errors).toEqual([{ day: DAY, pkg_version: "1.2", ci: "0", error_type: "post:TypeError", runs: 24 }]);
     const catalog = await db.prepare("SELECT versions_seen FROM config_catalog").first();
     expect(catalog).toEqual({ versions_seen: "1.2" });
   });

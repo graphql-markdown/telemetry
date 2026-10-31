@@ -238,11 +238,13 @@ const generate = async (env: Env, params: URLSearchParams): Promise<Response> =>
   )
     .bind(from, to, ciA, ciB)
     .all<{ runs: number; failures: number; pages_p50: number; pages_p95: number; duration_p50: number; duration_p95: number }>();
+  // Rows from before migration 0006 have ci = '' (unknown): only All counts them.
   const errors = await env.DB.prepare(
-    `SELECT error_type, SUM(runs) AS runs FROM generate_errors_daily WHERE day BETWEEN ?1 AND ?2
+    `SELECT error_type, SUM(runs) AS runs FROM generate_errors_ci_daily
+     WHERE day BETWEEN ?1 AND ?2 AND (ci IN (?3, ?4) OR (?5 AND ci = ''))
      GROUP BY error_type ORDER BY runs DESC`,
   )
-    .bind(from, to)
+    .bind(from, to, ciA, ciB, view === "all" ? 1 : 0)
     .all<{ error_type: string; runs: number }>();
   const shown = results.filter((row) => row.runs >= MIN_COUNT);
   const total = results.reduce((sum, row) => sum + row.runs, 0);

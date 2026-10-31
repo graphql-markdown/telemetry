@@ -31,7 +31,7 @@ beforeEach(async () => {
     db.prepare("DELETE FROM config_catalog_daily"),
     db.prepare("DELETE FROM rejects_daily"),
     db.prepare("DELETE FROM generate_daily"),
-    db.prepare("DELETE FROM generate_errors_daily"),
+    db.prepare("DELETE FROM generate_errors_ci_daily"),
   ]);
   resetAccessCache();
   await mockJwks();
@@ -197,8 +197,10 @@ describe("GET /v1/stats/generate", () => {
     db
       .prepare("INSERT INTO generate_daily VALUES (?, ?, 'cli', ?, ?, ?, 10, 100, 1000, 5000)")
       .bind(day, version, ci, runs, failures);
-  const error = (day: string, version: string, type: string, runs: number) =>
-    db.prepare("INSERT INTO generate_errors_daily VALUES (?, ?, ?, ?)").bind(day, version, type, runs);
+  const error = (day: string, version: string, type: string, runs: number, ci = "0") =>
+    db
+      .prepare("INSERT INTO generate_errors_ci_daily (day, pkg_version, ci, error_type, runs) VALUES (?, ?, ?, ?, ?)")
+      .bind(day, version, ci, type, runs);
 
   it("requires Access", async () => {
     expect((await get(`/v1/stats/generate?${Q}`)).status).toBe(403);
@@ -257,6 +259,22 @@ describe("GET /v1/stats/generate", () => {
     expect(local.versions).toEqual([]);
     const ci = (await (await get(`/v1/stats/generate?${Q}&view=ci`, token)).json()) as any;
     expect(ci.runs).toBe(9);
+  });
+
+  it("filters error types by view, counting rows of unknown ci only in All", async () => {
+    await db.batch([
+      run("2026-10-05", "1.0.0", 20, 15),
+      error("2026-10-05", "1.0.0", "Local", 5),
+      error("2026-10-05", "1.0.0", "Ci", 5, "1"),
+      error("2026-10-05", "1.0.0", "Legacy", 5, ""),
+    ]);
+    const errorsOf = async (view: string) =>
+      ((await (await get(`/v1/stats/generate?${Q}&view=${view}`, token)).json()) as any).errors.map(
+        (e: any) => e.error_type,
+      );
+    expect(await errorsOf("local")).toEqual(["Local"]);
+    expect(await errorsOf("ci")).toEqual(["Ci"]);
+    expect((await errorsOf("all")).sort()).toEqual(["Ci", "Legacy", "Local"]);
   });
 
   it("rejects bad params", async () => {
