@@ -121,12 +121,14 @@ resource "cloudflare_workers_script" "telemetry" {
   }
 }
 
-# Daily rollup of day D-1 (UTC).
+# Daily rollup of day D-1 (UTC), and the backfill tick that re-rolls one day
+# queued in rollup_backfill (see worker/src/backfill.ts).
 resource "cloudflare_workers_cron_trigger" "rollup" {
   account_id  = var.account_id
   script_name = cloudflare_workers_script.telemetry.script_name
   schedules = [
     { cron = "0 2 * * *" },
+    { cron = "5,15,25,35,45,55 * * * *" },
   ]
 }
 

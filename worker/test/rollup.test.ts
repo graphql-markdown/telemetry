@@ -1,6 +1,7 @@
 import { env as testEnv } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
+import { BACKFILL_CRON, MAX_BACKFILL_ATTEMPTS } from "../src/backfill";
 import type { Env } from "../src/env";
 import worker from "../src/index";
 import { MAX_ROWS_PER_DAY, previousDay, rollupDay } from "../src/rollup";
@@ -93,6 +94,7 @@ beforeEach(async () => {
     db.prepare("DELETE FROM config_catalog_daily"),
     db.prepare("DELETE FROM generate_daily"),
     db.prepare("DELETE FROM generate_errors_ci_daily"),
+    db.prepare("DELETE FROM rollup_backfill"),
   ]);
 });
 
@@ -484,6 +486,83 @@ describe("scheduled", () => {
     );
     expect((await counts(DAY)).length).toBeGreaterThan(0);
     expect(sqls[0]).toContain(`'${DAY} 00:00:00'`);
+  });
+});
+
+describe("backfill", () => {
+  // Ticks run on 2026-10-11, so the window is 2026-07-15 .. 2026-10-10.
+  const NOW = Date.parse("2026-10-11T00:05:00Z");
+  const tick = (extra: Partial<Env> = {}) =>
+    worker.scheduled({ scheduledTime: NOW, cron: BACKFILL_CRON } as ScheduledController, makeEnv(extra));
+  const queue = (...days: string[]) =>
+    db.batch(days.map((day) => db.prepare("INSERT INTO rollup_backfill (day) VALUES (?)").bind(day)));
+  const queued = async () =>
+    (await db.prepare("SELECT day, attempts FROM rollup_backfill ORDER BY day").all()).results;
+  const hookCalls = () =>
+    fetchMock.mock.calls.filter(([url]) => String(url).startsWith("https://hooks.test"));
+
+  it("does nothing on an empty queue", async () => {
+    mockAe(base);
+    await tick();
+    expect(sqls).toEqual([]);
+  });
+
+  it("rolls up the oldest queued day only, then removes it", async () => {
+    mockAe(base);
+    await queue("2026-10-09", DAY);
+    await tick();
+    expect(sqls.every((sql) => sql.includes("'2026-10-09 00:00:00'") || !sql.includes("toDateTime"))).toBe(true);
+    expect((await counts("2026-10-09")).length).toBeGreaterThan(0);
+    expect(await counts(DAY)).toEqual([]);
+    expect(await queued()).toEqual([{ day: DAY, attempts: 0 }]);
+  });
+
+  it("drops days outside the Analytics Engine window without touching their rows", async () => {
+    mockAe(base);
+    await db
+      .prepare("INSERT INTO daily_counts (day, ci, dim, value, measure, n) VALUES ('2026-07-14', '0', 'event', 'config', 'raw', 7)")
+      .run();
+    await queue("2026-07-14", "2026-10-11", "2026-02-30");
+    for (let i = 0; i < 3; i++) await tick({ ALERT_WEBHOOK: "https://hooks.test/x" });
+    expect(sqls).toEqual([]);
+    expect(await queued()).toEqual([]);
+    expect(await counts("2026-07-14")).toHaveLength(1);
+    expect(hookCalls()).toHaveLength(3);
+  });
+
+  it("accepts the oldest day of the window", async () => {
+    mockAe(base);
+    await queue("2026-07-15");
+    await tick();
+    expect(sqls.length).toBeGreaterThan(0);
+    expect(await queued()).toEqual([]);
+  });
+
+  it("keeps a failing day for a retry, then drops it with an alert", async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) =>
+      String(input).includes("/analytics_engine/sql")
+        ? new Response(null, { status: 500 })
+        : new Response(null, { status: 204 }),
+    );
+    await queue(DAY);
+    for (let i = 1; i < MAX_BACKFILL_ATTEMPTS; i++) {
+      await expect(tick({ ALERT_WEBHOOK: "https://hooks.test/x" })).rejects.toThrow("500");
+      expect(await queued()).toEqual([{ day: DAY, attempts: i }]);
+    }
+    expect(hookCalls()).toHaveLength(0);
+    await expect(tick({ ALERT_WEBHOOK: "https://hooks.test/x" })).rejects.toThrow("500");
+    expect(await queued()).toEqual([]);
+    expect(hookCalls()).toHaveLength(1);
+  });
+
+  it("leaves the queue alone on the daily cron", async () => {
+    mockAe(base);
+    await queue("2026-10-09");
+    await worker.scheduled(
+      { scheduledTime: Date.parse("2026-10-11T02:00:00Z"), cron: "0 2 * * *" } as ScheduledController,
+      makeEnv(),
+    );
+    expect(await queued()).toEqual([{ day: "2026-10-09", attempts: 0 }]);
   });
 });
 

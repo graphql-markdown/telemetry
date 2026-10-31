@@ -213,7 +213,21 @@ Deploy the Worker before releasing a client that sends major.minor. The previous
 
 #### Migration 0006 (generate errors by ci)
 
-`migrations/0006_generate_errors_ci.sql` moves `generate_errors_daily` to `generate_errors_ci_daily`, which adds a `ci` column so the top error types can be filtered by view. Existing rows get `ci = ''` (unknown) and count only in the All view. Rolling a day up again replaces them with rows split by ci. Raw generate events are all still inside the Analytics Engine retention.
+`migrations/0006_generate_errors_ci.sql` moves `generate_errors_daily` to `generate_errors_ci_daily`, which adds a `ci` column so the top error types can be filtered by view. Existing rows get `ci = ''` (unknown) and count only in the All view. Rolling a day up again replaces them with rows split by ci. Raw generate events are all still inside the Analytics Engine retention. To re-roll them, queue the days with `scripts/backfill.sh 2026-10-12 <yesterday>` (see [Backfill](#backfill)).
+
+#### Backfill
+
+Re-roll past days from Analytics Engine, for example after a rollup change. `scripts/backfill.sh FROM [TO]` queues days in the D1 table `rollup_backfill` (migration 0007), through the same wrangler path as `scripts/query.sh d1`. The ingest Worker's backfill cron (`5,15,25,35,45,55 * * * *`) rolls up the oldest queued day each tick, so 30 days take about 5 hours. There is no HTTP endpoint for it.
+
+```sh
+scripts/backfill.sh --dry-run 2026-10-12 2026-10-30   # print the SQL only
+scripts/backfill.sh 2026-10-12 2026-10-30             # queue (CLOUDFLARE_API_TOKEN with D1 Edit)
+scripts/backfill.sh --status                          # what is left
+```
+
+- A re-roll replaces the day's rows, like the daily rollup does. The config catalog does not count a day twice.
+- Days older than 88 days, or today and later, are dropped from the queue with an alert and never rolled. Analytics Engine keeps raw events about 90 days, so re-rolling an older day would empty it.
+- A day that fails 3 times is dropped with an alert.
 
 ### Deploy from CI
 

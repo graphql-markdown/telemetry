@@ -64,8 +64,8 @@
   // worker/.dev.vars.example.
   "keep_vars": true,
 
-  // Rollup of day D-1 (UTC).
-  "triggers": { "crons": ["0 2 * * *"] }
+  // Rollup of day D-1 (UTC), and the backfill tick (one queued day, see worker/src/backfill.ts).
+  "triggers": { "crons": ["0 2 * * *", "5,15,25,35,45,55 * * * *"] }
 
   // Secrets (not in this file): AE_SQL_TOKEN, ACCOUNT_ID, ALERT_WEBHOOK.
 }
