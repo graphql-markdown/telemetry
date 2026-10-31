@@ -67,12 +67,12 @@ describe("migration 0005 truncate pkgVersion", () => {
     const first = await read(db);
     expect(first.dc).toEqual([
       { value: "1.2", n: 5 },
-      { value: "1.3-rc", n: 5 },
+      { value: "1.3", n: 5 },
       { value: "unknown-value", n: 5 },
     ]);
     expect(first.gd).toEqual([
       { pkg_version: "1.2", runs: 4, failures: 2, pages_p50: 17.5, duration_p95: 17.5 },
-      { pkg_version: "1.3-rc", runs: 2, failures: 1, pages_p50: 5, duration_p95: 5 },
+      { pkg_version: "1.3", runs: 2, failures: 1, pages_p50: 5, duration_p95: 5 },
       { pkg_version: "unknown-value", runs: 0, failures: 1, pages_p50: 7, duration_p95: 7 },
     ]);
     expect(first.ge).toEqual([{ pkg_version: "1.2", runs: 7 }]);

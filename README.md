@@ -39,7 +39,7 @@ These hold in every change. Review them before merging anything that touches `wo
 - The only other header read is the Access JWT, and only on `/v1/stats`. `request.cf.colo` is used in memory for rate limits and the quarantine key (KV, 1 h TTL), and is never stored.
 - No `console.log` of request data. `observability.enabled` is `false` in `worker/wrangler.jsonc`.
 - Only allowlisted payload fields are stored (`worker/src/schema.ts`). Reject counters carry the reason only. The stored config (blob18 and `config_catalog.masked_config_json`) is canonical JSON: object keys sorted ascending at every level, array order kept.
-- `pkgVersion` is stored as major.minor (`1.2.3` becomes `1.2`, `1.2.3-rc.1` becomes `1.2-rc`, anything else becomes `unknown-value`): the prerelease tag is kept, the patch counter is dropped. The rollup truncates the same way.
+- `pkgVersion` is stored as major.minor (`1.2.3` and `1.2.3-rc.1` both become `1.2`, anything else becomes `unknown-value`): the patch and prerelease are dropped. The rollup truncates the same way.
 - The dashboard and public pages send a strict Content-Security-Policy (`default-src 'self'`, no inline script or style, `frame-ancestors 'none'`) and `Referrer-Policy: no-referrer`. uPlot is self-hosted in `dashboard/vendor/`. The dashboard gets the headers from `dashboard/_headers`. GitHub Pages cannot set headers, so the public page carries the policy in a `<meta>` tag in `public/index.html` (no `frame-ancestors`, which meta ignores).
 
 ## Queries

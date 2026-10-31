@@ -207,7 +207,7 @@ const VERSION_LOOSE = new RegExp(
 const MAX_ITEMS = 50;
 const MAX_INT = 1000;
 
-/** Closed-set version truncated to major.minor (plus prerelease tag, no counter), else `unknown-value`. */
+/** Closed-set version truncated to major.minor (patch and prerelease dropped), else `unknown-value`. */
 export const truncateVersion = (value: unknown): string => {
   if (typeof value !== "string") {
     return UNKNOWN_VALUE;
@@ -216,7 +216,7 @@ export const truncateVersion = (value: unknown): string => {
   if (match === null || (match[3] === undefined && value !== `${match[1]}${match[2] ?? ""}`)) {
     return UNKNOWN_VALUE;
   }
-  return match[3] === undefined ? match[1] : `${match[1]}-${match[3]}`;
+  return match[1];
 };
 
 const inRange = (value: unknown, min: number, max: number): boolean => {

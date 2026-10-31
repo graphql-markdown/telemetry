@@ -1,4 +1,4 @@
--- Anonymise pkgVersion: drop the patch (1.2.3 -> 1.2, 1.2.3-rc.1 -> 1.2-rc).
+-- Anonymise pkgVersion: drop the patch and prerelease (1.2.3 -> 1.2, 1.2.3-rc.1 -> 1.2).
 -- Existing rows are rewritten and rows that collapse onto the same key are
 -- merged. Already truncated values and unknown-value are left unchanged, so
 -- the migration is safe to run twice. Scratch tables are plain tables and are
@@ -10,8 +10,7 @@ DROP TABLE IF EXISTS _pkgv_ge;
 
 CREATE TABLE _pkgv_map (
   old TEXT PRIMARY KEY,
-  new TEXT NOT NULL,
-  t TEXT
+  new TEXT NOT NULL
 );
 
 INSERT OR IGNORE INTO _pkgv_map (old, new)
@@ -22,18 +21,10 @@ UNION SELECT j.value, j.value FROM config_catalog,
   json_each('["' || replace(config_catalog.versions_seen, ',', '","') || '"]') AS j
   WHERE config_catalog.versions_seen <> '';
 
--- Step A: keep X.Y, remember what follows the second dot in t.
+-- Keep X.Y: everything before the second dot (also drops any prerelease).
 UPDATE _pkgv_map SET
-  new = substr(old, 1, instr(old, '.') + instr(substr(old, instr(old, '.') + 1), '.') - 1),
-  t = substr(old, instr(old, '.') + instr(substr(old, instr(old, '.') + 1), '.') + 1)
+  new = substr(old, 1, instr(old, '.') + instr(substr(old, instr(old, '.') + 1), '.') - 1)
 WHERE old GLOB '[0-9]*.[0-9]*.[0-9]*';
-
--- Step B: for prereleases keep only the tag, t becomes e.g. rc.1.
-UPDATE _pkgv_map SET t = substr(t, instr(t, '-') + 1) WHERE t LIKE '%-%';
-
-UPDATE _pkgv_map SET
-  new = new || '-' || CASE WHEN instr(t, '.') = 0 THEN t ELSE substr(t, 1, instr(t, '.') - 1) END
-WHERE t GLOB '[a-z]*';
 
 CREATE TABLE _pkgv_dc AS
 SELECT d.day AS day, d.ci AS ci, d.dim AS dim, m.new AS value, d.measure AS measure, SUM(d.n) AS n
