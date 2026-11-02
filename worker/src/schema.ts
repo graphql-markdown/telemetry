@@ -8,6 +8,8 @@
  * subpath is published, and let Renovate keep it up to date.
  */
 
+import { canonicalJson } from "./fingerprint";
+
 export const EVENTS = [
   "config",
   "create_scaffold",
@@ -425,6 +427,37 @@ const sanitizeSection = (
   return FAIL;
 };
 
+/**
+ * Distinct items of a list, first occurrence first, unwrapped when only one is
+ * left: the number of items can single out a user, the set of kinds cannot.
+ */
+const collapseList = (value: unknown): unknown => {
+  if (!Array.isArray(value) || value.length === 0) {
+    return value;
+  }
+  const items = [
+    ...new Map(value.map((item) => [canonicalJson(item), item])).values(),
+  ];
+  return items.length === 1 ? items[0] : items;
+};
+
+/**
+ * A config or cli section with its `schema` list collapsed and `metatags`
+ * reduced to `<object>`: the number of tags and their shape can single out a
+ * user, and removing duplicates would keep both.
+ */
+export const collapseSection = (section: unknown): unknown => {
+  if (!isObject(section)) {
+    return section;
+  }
+  const { metatags } = section;
+  return {
+    ...section,
+    ...("schema" in section && { schema: collapseList(section.schema) }),
+    ...(typeof metatags === "object" && metatags !== null && { metatags: "<object>" }),
+  };
+};
+
 const validateLoader = (value: unknown): Checked<string | string[]> => {
   if (Array.isArray(value)) {
     const out: string[] = [];
@@ -517,7 +550,7 @@ export const validate = (payload: unknown): ValidationResult => {
     if (loader === FAIL) {
       return fail("schema");
     }
-    out.loader = loader;
+    out.loader = collapseList(loader);
   }
 
   if (payload.unknownKeys !== undefined) {
@@ -542,7 +575,7 @@ export const validate = (payload: unknown): ValidationResult => {
     if (checked === FAIL) {
       return fail("schema");
     }
-    out[section] = checked;
+    out[section] = collapseSection(checked);
   }
 
   const generate = out.event === "generate";

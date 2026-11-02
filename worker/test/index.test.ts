@@ -400,6 +400,12 @@ describe("fingerprints", () => {
     expect(b.fp).not.toBe(a.fp);
     expect(b.fpShape).not.toBe(a.fpShape);
   });
+
+  it("ignores the number of schema pointers and loaders", async () => {
+    const one = await fpOf({ config: { schema: "<glob>" }, loader: "glob" });
+    const many = await fpOf({ config: { schema: ["<glob>", "<glob>", "<glob>"] }, loader: ["glob", "glob", "glob"] });
+    expect(many).toEqual(one);
+  });
 });
 
 describe("anti-abuse", () => {

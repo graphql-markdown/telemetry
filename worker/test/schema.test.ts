@@ -34,7 +34,7 @@ const README_PAYLOAD = {
       fallback: "<string>",
     },
     printTypeOptions: { deprecated: "group", typeBadges: true },
-    metatags: [{ "<key:0>": "<string>", "<key:1>": "<string>" }],
+    metatags: "<object>",
     loaders: { UrlLoader: "@graphql-tools/url-loader" },
   },
   loader: "url",
@@ -108,6 +108,60 @@ describe("validate: normalization", () => {
   it("drops unknown top-level keys", () => {
     const result = validate({ ...base(), userId: "abc", ip: "1.2.3.4" });
     expect(result).toEqual({ ok: true, value: base() });
+  });
+});
+
+describe("validate: schema and loader lists", () => {
+  it.each([
+    [["<glob>", "<glob>", "<glob>"], "<glob>"],
+    [["<glob>"], "<glob>"],
+    ["<glob>", "<glob>"],
+    [["<url>", "<glob>", "<url>", "<glob>"], ["<url>", "<glob>"]],
+    [[{ "<key:0>": "<string>" }, { "<key:0>": "<string>" }], { "<key:0>": "<string>" }],
+    [[], []],
+  ])("collapses config.schema %j", (schema, expected) => {
+    const result = validate(withConfig({ schema }));
+    expect(result).toEqual({ ok: true, value: withConfig({ schema: expected }) });
+  });
+
+  it("collapses cli.schema", () => {
+    expect(validate({ ...base(), cli: { schema: ["<path>", "<path>"] } })).toMatchObject({
+      ok: true,
+      value: { cli: { schema: "<path>" } },
+    });
+  });
+
+  it("collapses the loader kinds", () => {
+    expect(validate({ ...base(), loader: ["glob", "glob"] })).toMatchObject({
+      ok: true,
+      value: { loader: "glob" },
+    });
+    expect(validate({ ...base(), loader: ["url", "glob", "url"] })).toMatchObject({
+      ok: true,
+      value: { loader: ["url", "glob"] },
+    });
+  });
+
+  it.each([
+    [[{ "<key:0>": "<string>", "<key:1>": "<string>" }, { "<key:0>": "<string>" }]],
+    [[{ "<key:0>": "<string>" }]],
+    [{ "<key:0>": "<string>" }],
+    [[]],
+    ["<object>"],
+  ])("reduces metatags %j to a token", (metatags) => {
+    expect(validate(withConfig({ metatags }))).toEqual({
+      ok: true,
+      value: withConfig({ metatags: "<object>" }),
+    });
+  });
+
+  it("leaves other lists alone", () => {
+    const config = { skipDocDirective: ["<string>", "<string>"] };
+    expect(validate(withConfig(config))).toEqual({ ok: true, value: withConfig(config) });
+  });
+
+  it("does not add a schema key", () => {
+    expect(validate(withConfig({ force: true }))).toEqual({ ok: true, value: withConfig({ force: true }) });
   });
 });
 
@@ -340,9 +394,9 @@ describe("validate: closed sets for free-text channels", () => {
 
   it("accepts a 120-entry map and stores 50 keys", () => {
     const wide = Object.fromEntries(Array.from({ length: 120 }, (_, i) => [`<key:${i}>`, "<string>"]));
-    const res = validate(withConfig({ metatags: wide })) as any;
+    const res = validate(withConfig({ customDirective: wide })) as any;
     expect(res.ok).toBe(true);
-    expect(Object.keys(res.value.config.metatags)).toHaveLength(50);
+    expect(Object.keys(res.value.config.customDirective)).toHaveLength(50);
   });
 
   it("truncates arrays and objects over 50 entries", () => {
@@ -350,10 +404,10 @@ describe("validate: closed sets for free-text channels", () => {
     expect(long).toMatchObject({ ok: true });
     expect((long as any).value.config.skipDocDirective).toHaveLength(50);
     const wide = Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`<key:${i}>`, "<string>"]));
-    const res = validate(withConfig({ metatags: wide })) as any;
-    expect(Object.keys(res.value.config.metatags)).toHaveLength(50);
-    expect(res.value.config.metatags["<key:49>"]).toBe("<string>");
-    expect(res.value.config.metatags["<key:50>"]).toBeUndefined();
+    const res = validate(withConfig({ customDirective: wide })) as any;
+    expect(Object.keys(res.value.config.customDirective)).toHaveLength(50);
+    expect(res.value.config.customDirective["<key:49>"]).toBe("<string>");
+    expect(res.value.config.customDirective["<key:50>"]).toBeUndefined();
   });
 
   it("accepts <custom-loader> as a loaders key and natural as a value", () => {
