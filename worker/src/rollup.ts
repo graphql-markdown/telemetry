@@ -1,6 +1,6 @@
 import type { Env } from "./env";
 import { canonicalJson } from "./fingerprint";
-import { truncateVersion, VALUE_STRINGS } from "./schema";
+import { collapseSection, truncateVersion, VALUE_STRINGS } from "./schema";
 
 /** At most this many `daily_counts` rows (and catalog rows) are written per day. */
 export const MAX_ROWS_PER_DAY = 2000;
@@ -169,10 +169,10 @@ const addColo = (counts: Counts, dim: string, value: string, row: Row): void => 
   add(counts, [String(row.ci), dim, value, "colo_sampled"].join(KEY_SEP), Number(row.colo_sampled ?? 0));
 };
 
-/** Config JSON with keys sorted at every level (blob18 rows written before sorting). */
+/** Config JSON in its stored form (blob18 rows written before key sorting or the section collapse). */
 const normalizeConfig = (config: string): string => {
   try {
-    return canonicalJson(JSON.parse(config));
+    return canonicalJson(collapseSection(JSON.parse(config)));
   } catch {
     return config;
   }
@@ -182,7 +182,7 @@ const normalizeConfig = (config: string): string => {
 const settingsOf = (config: string): Array<[string, string]> => {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(config);
+    parsed = JSON.parse(normalizeConfig(config));
   } catch {
     return [];
   }

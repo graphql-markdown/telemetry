@@ -280,6 +280,22 @@ describe("rollupDay", () => {
     expect(row).toEqual({ masked_config_json: '{"mode":"group","schema":"<url>"}', first_seen: "2026-10-01", events: 25 });
   });
 
+  it("collapses schema and metatags of rows written before the collapse", async () => {
+    const config = '{"metatags":[{"<key:0>":"<string>"}],"schema":["<glob>","<glob>","<glob>"]}';
+    mockAe({
+      ...base,
+      blob18: [{ value: config, raw: 3, debounced_1h: 1, debounced_1d: 1 }],
+      catalog: [{ fp_shape: "s1", version: "1.0.0", config, events: 3, debounced: 1 }],
+    });
+    await rollupDay(makeEnv(), DAY);
+    const catalog = await db.prepare("SELECT masked_config_json FROM config_catalog").first();
+    expect(catalog?.masked_config_json).toBe('{"metatags":"<object>","schema":"<glob>"}');
+    const setting = await db
+      .prepare("SELECT value FROM daily_counts WHERE dim = 'setting.schema' LIMIT 1")
+      .first();
+    expect(setting?.value).toBe("<glob>");
+  });
+
   it("gives identical rows when run twice for the same day", async () => {
     mockAe(base);
     await rollupDay(makeEnv(), DAY);
