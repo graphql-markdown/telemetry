@@ -193,55 +193,7 @@ scripts/deploy.sh
 
 The script reads `d1_database_id` and `quarantine_kv_id` from the tofu output, writes a temporary copy of `worker/wrangler.jsonc` with the real D1 and KV ids (and the same for `worker/wrangler.dashboard.jsonc`), runs `wrangler deploy` for both configs and `wrangler d1 migrations apply gqlmd-telemetry --remote` once, then deletes the copies. It needs `tofu` initialised in `infra/`. Run it again after each Worker change or new file in `migrations/`, or let CI do it (below).
 
-#### Migration 0005 (pkgVersion truncation)
-
-`migrations/0005_truncate_pkg_version.sql` rewrites existing data to major.minor (`daily_counts` pkgVersion values, `generate_daily`, `generate_errors_daily`, `config_catalog.versions_seen`), merging rows that collapse into one.
-
-1. Before deploying, note a restore point: `wrangler d1 time-travel info gqlmd-telemetry`. Rollback: `wrangler d1 time-travel restore gqlmd-telemetry --bookmark <bookmark>`.
-2. Deploy (CI or `scripts/deploy.sh`), which applies 0005.
-3. Check that no 3-part versions remain:
-
-   ```sh
-   wrangler d1 execute gqlmd-telemetry --remote --command "SELECT DISTINCT value FROM daily_counts WHERE dim='pkgVersion'"
-   wrangler d1 execute gqlmd-telemetry --remote --command "SELECT DISTINCT pkg_version FROM generate_daily"
-   ```
-
-4. Re-export the public stats (`scripts/export-public.sh`, or wait for the public-stats workflow).
-
-Analytics Engine raw rows keep full versions until the 90-day retention expires. Only the rollup reads them, and it truncates.
-
-Deploy the Worker before releasing a client that sends major.minor. The previous Worker maps `1.2` to `unknown-value`.
-
-#### Migration 0006 (generate errors by ci)
-
-`migrations/0006_generate_errors_ci.sql` moves `generate_errors_daily` to `generate_errors_ci_daily`, which adds a `ci` column so the top error types can be filtered by view. Existing rows get `ci = ''` (unknown) and count only in the All view. Rolling a day up again replaces them with rows split by ci. Raw generate events are all still inside the Analytics Engine retention. To re-roll them, queue the days with `scripts/backfill.sh 2026-10-12 <yesterday>` (see [Backfill](#backfill)).
-
-#### Catalog rebuild
-
-`config_catalog` and `config_catalog_daily` can be rebuilt from Analytics Engine. The rollup computes the catalog id from the normalized config, `loader` (blob7) and `formatter` (blob6), not from blob3, so rows written under an older masking merge with their current form. `fp_shape` in D1 therefore hashes the same inputs as ingest, and differs from blob3 only on those older rows and on truncated configs.
-
-`config_catalog` only moves forward (`last_rolled_day`), so a re-roll does not rewrite it. To rebuild:
-
-1. Check that the history fits the window: backfill drops days older than 88 days, and their catalog rows would be lost.
-
-   ```sh
-   scripts/query.sh d1 "SELECT MIN(first_seen), COUNT(*) FROM config_catalog"
-   scripts/query.sh d1 "SELECT day, SUM(events), SUM(debounced_events) FROM config_catalog_daily GROUP BY day ORDER BY day"
-   ```
-
-2. Start after the 02:00 UTC rollup, so the whole window (at most about 15 hours) finishes before the next one. A rollup of a later day during the backfill would block the older days through `last_rolled_day`.
-3. Note a restore point with `wrangler d1 time-travel info gqlmd-telemetry`. A restore also undoes any rollup run since.
-4. Clear the tables and queue the days:
-
-   ```sh
-   scripts/query.sh d1 "DELETE FROM config_catalog_daily"
-   scripts/query.sh d1 "DELETE FROM config_catalog"
-   scripts/backfill.sh <first day> <yesterday>
-   ```
-
-5. Once `scripts/backfill.sh --status` is empty, compare the per-day `SUM(events)` with step 1. Distinct-config counts may fall; event totals must not.
-
-The catalog panel of the dashboard is incomplete until the queue is empty. The public page does not read these tables.
+The latest data migration is described in [MIGRATION.md](MIGRATION.md).
 
 #### Backfill
 
