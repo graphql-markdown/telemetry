@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { canonicalJson, fingerprints, formatterOf } from "../src/fingerprint";
+import { fingerprints } from "../src/fingerprint";
+import { buildBlobs } from "../src/index";
 import { catalogId } from "../src/rollup";
 import { validate } from "../src/schema";
 
@@ -22,18 +23,30 @@ const base = {
 
 describe("catalogId", () => {
   it.each([
-    [{ schema: "<url>", formatter: "@graphql-markdown/docusaurus" }, "url"],
-    [{ schema: ["<glob>", "<glob>"], metatags: [{ "<key:0>": "<string>" }] }, ["glob", "glob"]],
-    [{ schema: ["<url>", "<glob>"] }, ["url", "glob"]],
-  ])("matches the ingest fpShape of %j", async (config, loader) => {
-    const result = validate({ ...base, config, loader });
+    [{ config: { schema: "<url>", formatter: "@graphql-markdown/docusaurus" }, loader: "url" }],
+    [{ config: { schema: ["<glob>", "<glob>"], metatags: [{ "<key:0>": "<string>" }] }, loader: ["glob", "glob"] }],
+    [{ config: { schema: ["<url>", "<glob>"] }, loader: ["url", "glob"] }],
+    [{ cli: { formatter: "@graphql-markdown/docusaurus" }, loader: "url" }],
+    [{ loader: "url" }],
+    [{ config: {} }],
+    [{}],
+  ])("matches the ingest fpShape of %j through the blobs", async (extra) => {
+    const result = validate({ ...base, ...extra });
     if (!result.ok) {
       throw new Error(result.reason);
     }
-    const { value } = result;
-    const stored = Array.isArray(value.loader) ? value.loader.join(",") : String(value.loader);
-    const id = await catalogId(canonicalJson(value.config), stored, formatterOf(value));
-    expect(id).toBe((await fingerprints(value)).fpShape);
+    const { fp, fpShape } = await fingerprints(result.value);
+    const blobs = buildBlobs(result.value, fp, fpShape, "0");
+    expect(await catalogId(blobs[17], blobs[6], blobs[5])).toBe(fpShape);
+  });
+
+  it("gives one id to an absent and an empty config", async () => {
+    const payload = validate(base);
+    const empty = validate({ ...base, config: {} });
+    if (!payload.ok || !empty.ok) {
+      throw new Error("invalid payload");
+    }
+    expect((await fingerprints(empty.value)).fpShape).toBe((await fingerprints(payload.value)).fpShape);
   });
 
   it("gives one id for a loader blob with repeated kinds", async () => {

@@ -1,5 +1,5 @@
 import type { Env } from "./env";
-import { canonicalJson, shapeHash } from "./fingerprint";
+import { canonicalJson, shapeConfig, shapeHash } from "./fingerprint";
 import { collapseSection, truncateVersion, VALUE_STRINGS } from "./schema";
 
 /** At most this many `daily_counts` rows (and catalog rows) are written per day. */
@@ -203,7 +203,7 @@ export const catalogId = (
   } catch {
     // Kept as a string, like normalizeConfig.
   }
-  return shapeHash({ config: parsed, loader: loaderOf(loader), formatter });
+  return shapeHash({ config: shapeConfig(parsed), loader: loaderOf(loader), formatter });
 };
 
 /** Top-level config keys whose value is an enum or mask token (or a boolean). */

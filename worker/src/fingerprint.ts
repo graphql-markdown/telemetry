@@ -41,6 +41,19 @@ export const formatterOf = (payload: Json): string => {
   return "";
 };
 
+/**
+ * Config as hashed: `null` when absent or empty, because blob18 stores both as
+ * `{}` and the rollup hashes the stored form.
+ */
+export const shapeConfig = (config: unknown): unknown => {
+  const empty =
+    typeof config === "object" &&
+    config !== null &&
+    !Array.isArray(config) &&
+    Object.keys(config).length === 0;
+  return empty ? null : (config ?? null);
+};
+
 /** Hash of the masked config, loader and formatter of a payload. */
 export const shapeHash = (shape: {
   config: unknown;
@@ -61,7 +74,7 @@ export const fingerprints = async (
   payload: Json,
 ): Promise<{ fp: string; fpShape: string }> => {
   const shape = {
-    config: payload.config ?? null,
+    config: shapeConfig(payload.config),
     loader: payload.loader ?? null,
     formatter: formatterOf(payload),
   };
