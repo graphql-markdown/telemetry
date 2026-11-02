@@ -442,6 +442,27 @@ const collapseList = (value: unknown): unknown => {
 };
 
 /**
+ * A raw section with the repeated strings of its `schema` list removed, so the
+ * item limit of `sanitizeSection` counts kinds, not pointers. Other items are
+ * left to `collapseList`, once `sanitizeSection` has checked their depth.
+ */
+const dedupeSchemaStrings = (section: Json): Json => {
+  if (!Array.isArray(section.schema)) {
+    return section;
+  }
+  const seen = new Set<string>();
+  const schema = section.schema.filter((item: unknown) => {
+    if (typeof item !== "string") {
+      return true;
+    }
+    const isNew = !seen.has(item);
+    seen.add(item);
+    return isNew;
+  });
+  return { ...section, schema };
+};
+
+/**
  * A config or cli section with its `schema` list collapsed and `metatags`
  * reduced to `<object>`: the number of tags and their shape can single out a
  * user, and removing duplicates would keep both.
@@ -568,7 +589,7 @@ export const validate = (payload: unknown): ValidationResult => {
       return fail("schema");
     }
     const checked = sanitizeSection(
-      payload[section],
+      dedupeSchemaStrings(payload[section] as Json),
       0,
       section === "config" ? CONFIG_KEYS : CLI_KEYS,
     );

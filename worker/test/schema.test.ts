@@ -131,6 +131,34 @@ describe("validate: schema and loader lists", () => {
     });
   });
 
+  describe.each(["config", "cli"])("%s.schema over the item limit", (section) => {
+    const withSchema = (schema: unknown) => ({ ...base(), [section]: { schema } });
+    const globs = (n: number) => Array<string>(n).fill("<glob>");
+
+    it.each([49, 50, 51, 120])("keeps a kind after %i repeated items", (n) => {
+      expect(validate(withSchema([...globs(n), "<url>"]))).toEqual({
+        ok: true,
+        value: withSchema(["<glob>", "<url>"]),
+      });
+    });
+
+    it("unwraps a single kind", () => {
+      expect(validate(withSchema(globs(120)))).toEqual({ ok: true, value: withSchema("<glob>") });
+    });
+
+    it("rejects a raw string after repeated items", () => {
+      expect(validate(withSchema([...globs(60), "https://acme.test/graphql"])).ok).toBe(false);
+    });
+
+    it("still applies the depth limit", () => {
+      let deep: unknown = "<glob>";
+      for (let i = 0; i < 10; i += 1) {
+        deep = [deep];
+      }
+      expect(validate(withSchema([...globs(60), deep])).ok).toBe(false);
+    });
+  });
+
   it("collapses the loader kinds", () => {
     expect(validate({ ...base(), loader: ["glob", "glob"] })).toMatchObject({
       ok: true,
