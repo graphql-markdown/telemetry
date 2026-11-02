@@ -216,6 +216,33 @@ Deploy the Worker before releasing a client that sends major.minor. The previous
 
 `migrations/0006_generate_errors_ci.sql` moves `generate_errors_daily` to `generate_errors_ci_daily`, which adds a `ci` column so the top error types can be filtered by view. Existing rows get `ci = ''` (unknown) and count only in the All view. Rolling a day up again replaces them with rows split by ci. Raw generate events are all still inside the Analytics Engine retention. To re-roll them, queue the days with `scripts/backfill.sh 2026-10-12 <yesterday>` (see [Backfill](#backfill)).
 
+#### Catalog rebuild
+
+`config_catalog` and `config_catalog_daily` can be rebuilt from Analytics Engine. The rollup computes the catalog id from the normalized config, `loader` (blob7) and `formatter` (blob6), not from blob3, so rows written under an older masking merge with their current form. `fp_shape` in D1 therefore hashes the same inputs as ingest, and differs from blob3 only on those older rows and on truncated configs.
+
+`config_catalog` only moves forward (`last_rolled_day`), so a re-roll does not rewrite it. To rebuild:
+
+1. Check that the history fits the window: backfill drops days older than 88 days, and their catalog rows would be lost.
+
+   ```sh
+   scripts/query.sh d1 "SELECT MIN(first_seen), COUNT(*) FROM config_catalog"
+   scripts/query.sh d1 "SELECT day, SUM(events), SUM(debounced_events) FROM config_catalog_daily GROUP BY day ORDER BY day"
+   ```
+
+2. Start after the 02:00 UTC rollup, so the whole window (at most about 15 hours) finishes before the next one. A rollup of a later day during the backfill would block the older days through `last_rolled_day`.
+3. Note a restore point with `wrangler d1 time-travel info gqlmd-telemetry`. A restore also undoes any rollup run since.
+4. Clear the tables and queue the days:
+
+   ```sh
+   scripts/query.sh d1 "DELETE FROM config_catalog_daily"
+   scripts/query.sh d1 "DELETE FROM config_catalog"
+   scripts/backfill.sh <first day> <yesterday>
+   ```
+
+5. Once `scripts/backfill.sh --status` is empty, compare the per-day `SUM(events)` with step 1. Distinct-config counts may fall; event totals must not.
+
+The catalog panel of the dashboard is incomplete until the queue is empty. The public page does not read these tables.
+
 #### Backfill
 
 Re-roll past days from Analytics Engine, for example after a rollup change. `scripts/backfill.sh FROM [TO]` queues days in the D1 table `rollup_backfill` (migration 0007), through `scripts/query.sh d1` (D1 API, database looked up by name). The ingest Worker's backfill cron (`5,15,25,35,45,55 * * * *`) rolls up the oldest queued day each tick, so 30 days take about 5 hours. There is no HTTP endpoint for it.

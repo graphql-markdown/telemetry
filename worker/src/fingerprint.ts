@@ -41,6 +41,15 @@ export const formatterOf = (payload: Json): string => {
   return "";
 };
 
+/** Hash of the masked config, loader and formatter of a payload. */
+export const shapeHash = (shape: {
+  config: unknown;
+  loader: unknown;
+  formatter: string;
+}): Promise<string> => {
+  return sha256Hex(canonicalJson(shape));
+};
+
 /**
  * Server-side fingerprints. `fpShape` hashes only the masked config, loader
  * and formatter, so catalog identity is stable across versions, events and
@@ -65,6 +74,6 @@ export const fingerprints = async (
   };
   return {
     fp: await sha256Hex(canonicalJson(full)),
-    fpShape: await sha256Hex(canonicalJson(shape)),
+    fpShape: await shapeHash(shape),
   };
 };

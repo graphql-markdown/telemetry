@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import { BACKFILL_CRON, MAX_BACKFILL_ATTEMPTS } from "../src/backfill";
 import type { Env } from "../src/env";
 import worker from "../src/index";
-import { MAX_ROWS_PER_DAY, previousDay, rollupDay } from "../src/rollup";
+import { catalogId, MAX_ROWS_PER_DAY, previousDay, rollupDay } from "../src/rollup";
 import { applyMigrations } from "./helpers";
 
 const DAY = "2026-10-10";
@@ -17,7 +17,7 @@ const keyOf = (sql: string): string => {
   if (sql.includes("FROM gqlmd_rejects")) return "rejects";
   if (sql.includes("blob17 = '1'")) return "quarantined";
   if (sql.includes("blob17 = '2'")) return `colo:${/SELECT (blob\d+) AS value/.exec(sql)?.[1]}`;
-  if (sql.includes("AS fp_shape")) return "catalog";
+  if (sql.includes("blob18 AS config")) return "catalog";
   if (sql.includes("AS error_type")) return "generate_errors";
   if (sql.includes("AS pages_p50")) return "generate_quantiles";
   if (sql.includes("AS failures")) return "generate";
@@ -234,7 +234,7 @@ describe("rollupDay", () => {
     const catalog = await db.prepare("SELECT * FROM config_catalog").all();
     expect(catalog.results).toEqual([
       {
-        fp_shape: "s1",
+        fp_shape: await catalogId('{"schema":"<url>"}', "", ""),
         masked_config_json: '{"schema":"<url>"}',
         versions_seen: "1.0,1.1",
         first_seen: DAY,
@@ -268,8 +268,9 @@ describe("rollupDay", () => {
     await db
       .prepare(
         `INSERT INTO config_catalog (fp_shape, masked_config_json, versions_seen, first_seen, last_seen, events, debounced_events, last_rolled_day)
-         VALUES ('s1', '{"schema":"<url>","mode":"group"}', '1.0.0', '2026-10-01', '2026-10-01', 5, 2, '2026-10-01')`,
+         VALUES (?1, '{"schema":"<url>","mode":"group"}', '1.0.0', '2026-10-01', '2026-10-01', 5, 2, '2026-10-01')`,
       )
+      .bind(await catalogId('{"mode":"group","schema":"<url>"}', "", ""))
       .run();
     mockAe({
       ...base,
@@ -278,6 +279,26 @@ describe("rollupDay", () => {
     await rollupDay(makeEnv(), DAY);
     const row = await db.prepare("SELECT masked_config_json, first_seen, events FROM config_catalog").first();
     expect(row).toEqual({ masked_config_json: '{"mode":"group","schema":"<url>"}', first_seen: "2026-10-01", events: 25 });
+  });
+
+  it("merges rows that differ only by the counts the collapse removes", async () => {
+    const row = { version: "1.0.0", formatter: "", debounced: 1 };
+    mockAe({
+      ...base,
+      catalog: [
+        { ...row, fp_shape: "old-3", config: '{"schema":["<glob>","<glob>","<glob>"]}', loader: "glob,glob,glob", events: 3 },
+        { ...row, fp_shape: "old-2", config: '{"schema":["<glob>","<glob>"]}', loader: "glob,glob", events: 2 },
+        { ...row, fp_shape: "new", config: '{"schema":"<glob>"}', loader: "glob", events: 1 },
+      ],
+    });
+    await rollupDay(makeEnv(), DAY);
+    const id = await catalogId('{"schema":"<glob>"}', "glob", "");
+    expect((await db.prepare("SELECT fp_shape, masked_config_json, events, debounced_events FROM config_catalog").all()).results).toEqual([
+      { fp_shape: id, masked_config_json: '{"schema":"<glob>"}', events: 6, debounced_events: 3 },
+    ]);
+    expect((await db.prepare("SELECT fp_shape, events FROM config_catalog_daily").all()).results).toEqual([
+      { fp_shape: id, events: 6 },
+    ]);
   });
 
   it("collapses schema and metatags of rows written before the collapse", async () => {
@@ -316,7 +337,7 @@ describe("rollupDay", () => {
         { fp_shape: "s1", ci: "0", version: "1.0.0", config: "{}", events: 20, debounced: 6 },
         { fp_shape: "s1", ci: "0", version: "1.1.0", config: "{}", events: 10, debounced: 4 },
         { fp_shape: "s1", ci: "1", version: "1.0.0", config: "{}", events: 7, debounced: 2 },
-        { fp_shape: "s2", ci: "0", version: "1.0.0", config: "{}", events: 3, debounced: 1 },
+        { fp_shape: "s2", ci: "0", version: "1.0.0", config: "{\"force\":true}", events: 3, debounced: 1 },
       ],
     });
     const daily = async () =>
@@ -327,12 +348,17 @@ describe("rollupDay", () => {
       ).results;
     await rollupDay(makeEnv(), DAY);
     const first = await daily();
-    expect(first).toEqual([
-      { day: DAY, fp_shape: "s1", ci: "0", events: 30, debounced_events: 10 },
-      { day: DAY, fp_shape: "s1", ci: "1", events: 7, debounced_events: 2 },
-      { day: DAY, fp_shape: "s2", ci: "0", events: 3, debounced_events: 1 },
-    ]);
-    const catalogSql = sqls.find((q) => q.includes("AS fp_shape")) ?? "";
+    const s1 = await catalogId("{}", "", "");
+    const s2 = await catalogId('{"force":true}', "", "");
+    expect(first).toHaveLength(3);
+    expect(first).toEqual(
+      expect.arrayContaining([
+        { day: DAY, fp_shape: s1, ci: "0", events: 30, debounced_events: 10 },
+        { day: DAY, fp_shape: s1, ci: "1", events: 7, debounced_events: 2 },
+        { day: DAY, fp_shape: s2, ci: "0", events: 3, debounced_events: 1 },
+      ]),
+    );
+    const catalogSql = sqls.find((q) => q.includes("blob18 AS config")) ?? "";
     expect(catalogSql).toContain("blob17 = '0'");
     await rollupDay(makeEnv(), DAY);
     expect(await daily()).toEqual(first);
