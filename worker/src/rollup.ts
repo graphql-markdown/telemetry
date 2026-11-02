@@ -1,5 +1,5 @@
 import type { Env } from "./env";
-import { canonicalJson } from "./fingerprint";
+import { canonicalJson, shapeConfig, shapeHash } from "./fingerprint";
 import { collapseSection, truncateVersion, VALUE_STRINGS } from "./schema";
 
 /** At most this many `daily_counts` rows (and catalog rows) are written per day. */
@@ -86,12 +86,12 @@ const quarantinedSql = (day: string): string => {
 
 const catalogSql = (day: string): string => {
   return (
-    `SELECT fp_shape, ci, version, config, SUM(events) AS events, count() AS debounced FROM (` +
-    `SELECT blob3 AS fp_shape, blob12 AS ci, blob5 AS version, blob18 AS config, ` +
+    `SELECT ci, version, config, loader, formatter, SUM(events) AS events, count() AS debounced FROM (` +
+    `SELECT blob12 AS ci, blob5 AS version, blob18 AS config, blob7 AS loader, blob6 AS formatter, ` +
     `blob2 AS fp, toStartOfHour(timestamp) AS hour, SUM(_sample_interval * double1) AS events ` +
     `FROM gqlmd_events WHERE ${dayWindow(day)} AND ${CLEAN} ` +
-    `AND blob1 = 'config' GROUP BY fp_shape, ci, version, config, fp, hour) ` +
-    `GROUP BY fp_shape, ci, version, config`
+    `AND blob1 = 'config' GROUP BY ci, version, config, loader, formatter, fp, hour) ` +
+    `GROUP BY ci, version, config, loader, formatter`
   );
 };
 
@@ -176,6 +176,34 @@ const normalizeConfig = (config: string): string => {
   } catch {
     return config;
   }
+};
+
+/** Loader blob as a payload value: distinct kinds, unwrapped when one is left. */
+const loaderOf = (blob: string): string | string[] | null => {
+  const kinds = [...new Set(blob.split(",").filter((kind) => kind !== ""))];
+  if (kinds.length === 0) {
+    return null;
+  }
+  return kinds.length === 1 ? kinds[0] : kinds;
+};
+
+/**
+ * Catalog id of a config event, from its stored form. blob3 is not used: rows
+ * written before the section collapse hash the lists that the collapse removes,
+ * so configs that are now identical would stay apart.
+ */
+export const catalogId = (
+  config: string,
+  loader: string,
+  formatter: string,
+): Promise<string> => {
+  let parsed: unknown = config;
+  try {
+    parsed = JSON.parse(config);
+  } catch {
+    // Kept as a string, like normalizeConfig.
+  }
+  return shapeHash({ config: shapeConfig(parsed), loader: loaderOf(loader), formatter });
 };
 
 /** Top-level config keys whose value is an enum or mask token (or a boolean). */
@@ -323,9 +351,10 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
   const shapes = new Map<string, Shape>();
   const dailyShapes = new Map<string, { events: number; debounced: number }>();
   for (const row of await query(env, catalogSql(day))) {
-    const id = String(row.fp_shape);
+    const config = normalizeConfig(String(row.config));
+    const id = await catalogId(config, String(row.loader ?? ""), String(row.formatter ?? ""));
     const shape = shapes.get(id) ?? {
-      config: normalizeConfig(String(row.config)),
+      config,
       versions: new Set<string>(),
       events: 0,
       debounced: 0,

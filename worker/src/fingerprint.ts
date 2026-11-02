@@ -42,6 +42,28 @@ export const formatterOf = (payload: Json): string => {
 };
 
 /**
+ * Config as hashed: `null` when absent or empty, because blob18 stores both as
+ * `{}` and the rollup hashes the stored form.
+ */
+export const shapeConfig = (config: unknown): unknown => {
+  const empty =
+    typeof config === "object" &&
+    config !== null &&
+    !Array.isArray(config) &&
+    Object.keys(config).length === 0;
+  return empty ? null : (config ?? null);
+};
+
+/** Hash of the masked config, loader and formatter of a payload. */
+export const shapeHash = (shape: {
+  config: unknown;
+  loader: unknown;
+  formatter: string;
+}): Promise<string> => {
+  return sha256Hex(canonicalJson(shape));
+};
+
+/**
  * Server-side fingerprints. `fpShape` hashes only the masked config, loader
  * and formatter, so catalog identity is stable across versions, events and
  * targets. `fp` adds pkgVersion, graphqlMajor, event and target. Per-machine
@@ -52,7 +74,7 @@ export const fingerprints = async (
   payload: Json,
 ): Promise<{ fp: string; fpShape: string }> => {
   const shape = {
-    config: payload.config ?? null,
+    config: shapeConfig(payload.config),
     loader: payload.loader ?? null,
     formatter: formatterOf(payload),
   };
@@ -65,6 +87,6 @@ export const fingerprints = async (
   };
   return {
     fp: await sha256Hex(canonicalJson(full)),
-    fpShape: await sha256Hex(canonicalJson(shape)),
+    fpShape: await shapeHash(shape),
   };
 };
