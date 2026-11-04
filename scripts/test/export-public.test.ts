@@ -106,8 +106,7 @@ describe("export-public.sh", () => {
       row("event", "run", 6, { measure: "debounced_1d" }),
     ]);
     expect(json.kpis.events.totals).toEqual([{ value: "run", n: 11 }]);
-    expect(json.kpis.configs.totals).toEqual([{ value: "run", n: 6 }]);
-    expect(json.kpis.debounced).toEqual(json.kpis.configs);
+    expect(json.kpis.debounced.totals).toEqual([{ value: "run", n: 6 }]);
   });
 
   it("settings has all six keys in order, empty when absent", () => {
@@ -139,7 +138,7 @@ describe("export-public.sh", () => {
   it("empty results yields the full structure and exit 0", () => {
     const { res, json } = runRows([]);
     expect(res.status).toBe(0);
-    expect(Object.keys(json.kpis)).toEqual(["events", "configs", "debounced"]);
+    expect(Object.keys(json.kpis)).toEqual(["events", "debounced"]);
     for (const k of Object.keys(json.kpis)) expect(json.kpis[k]).toEqual(EMPTY);
     expect(Object.keys(json.panels)).toEqual(PANELS);
     for (const p of PANELS) expect(json.panels[p]).toEqual(EMPTY);

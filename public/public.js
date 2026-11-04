@@ -186,7 +186,7 @@
   }
 
   function render(data) {
-    ["events", "configs", "debounced"].forEach(function (name) { kpi(name, data.kpis[name]); });
+    ["events", "debounced"].forEach(function (name) { kpi(name, data.kpis[name]); });
     Array.prototype.forEach.call(panels.querySelectorAll("section"), function (section) {
       reset(section);
       var d = data.panels[section.dataset.panel];
