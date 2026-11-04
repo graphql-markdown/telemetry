@@ -33,12 +33,19 @@ describe("dashboard assets", () => {
   });
 
   it("has the toggles, range picker and every panel", () => {
-    for (const needle of ['name="range"', 'value="365"', 'value="events"', 'value="debounced"', 'value="configs"', 'value="colo_sampled"', 'value="local"', 'value="ci"', 'value="all"']) {
+    for (const needle of ['name="range"', 'value="365"', 'value="events"', 'value="debounced"', 'value="colo_sampled"', 'value="local"', 'value="ci"', 'value="all"']) {
       expect(html).toContain(needle);
     }
     for (const panel of ["versions", "ci", "provider", "formatter", "graphql", "loader", "create", "targets", "settings", "catalog", "generate", "health"]) {
       expect(html).toContain(`data-panel="${panel}"`);
     }
+  });
+
+  it("sizes the KPI grid to its three tiles", () => {
+    expect(html).toContain('<div class="kpis kpis-3" id="kpis">');
+    expect([...html.matchAll(/data-kpi="([a-z]+)"/g)].map((m) => m[1])).toEqual(["events", "debounced", "quarantined"]);
+    expect(css).toContain(".kpis.kpis-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }");
+    expect(css).toContain(".kpis-3 .kpi:first-child { grid-column: 1 / -1; }");
   });
 
   it("declares light and dark color schemes", () => {

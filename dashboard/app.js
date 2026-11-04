@@ -35,7 +35,7 @@
 
   function params() {
     var kind = form.elements.measure.value;
-    var measure = kind === "events" ? "raw" : kind === "configs" ? "debounced_1d" : kind === "colo_sampled" ? "colo_sampled" : "debounced_1d";
+    var measure = kind === "events" ? "raw" : kind === "colo_sampled" ? "colo_sampled" : "debounced_1d";
     var to = new Date();
     var from = new Date(to.getTime() - (Number(form.elements.range.value) - 1) * 86400000);
     return { from: iso(from), to: iso(to), measure: measure, view: form.elements.view.value };
@@ -280,7 +280,6 @@
     var base = { dim: "event", from: query.from, to: query.to, view: query.view };
     var jobs = [
       ["events", Object.assign({}, base, { measure: "raw" }), "Raw events · " + query.view + " view"],
-      ["configs", Object.assign({}, base, { measure: "debounced_1d" }), "Sum of daily distinct configs"],
       ["debounced", Object.assign({}, base, { measure: "debounced_1d" }), "Debounced 1d · " + query.view + " view"],
       ["quarantined", Object.assign({}, base, { measure: "quarantined", view: "all" }), "All views · excluded from usage panels"],
     ];

@@ -45,6 +45,12 @@ describe("public page static checks", () => {
     expect(html).toContain('id="updated"');
   });
 
+  it("sizes the KPI grid to its two tiles", () => {
+    expect(html).toContain('<div class="kpis kpis-2" id="kpis">');
+    expect([...html.matchAll(/data-kpi="([a-z]+)"/g)].map((m) => m[1])).toEqual(["events", "debounced"]);
+    expect(read("dashboard/style.css")).toContain(".kpis.kpis-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }");
+  });
+
   it("public.js fetches relative stats.json and avoids innerHTML", () => {
     expect(js).toContain('fetch("stats.json")');
     expect(js.match(/fetch\(/g)).toHaveLength(1);
@@ -69,7 +75,7 @@ describe("public page static checks", () => {
   it("states that the page shows the all view", () => {
     const foot = (k: string) => new RegExp(`data-kpi-foot="${k}">([^<]*)<`).exec(html)![1];
     expect(foot("events")).toBe("Raw events · all view");
-    expect(foot("configs")).toBe("Sum of daily distinct configs");
+    expect(html).not.toContain('data-kpi="configs"');
     expect(foot("debounced")).toBe("Debounced 1d · all view");
     expect(html).toContain("Local and CI runs are counted together; the CI vs local chart and the CI provider panel split them.");
     expect(html).not.toContain("every other figure covers local runs");
@@ -156,8 +162,7 @@ const fixture = {
   min_count: 5,
   kpis: {
     events: { series: [], totals: [{ value: "a", n: 1000 }, { value: "b", n: 234 }], suppressed_count: 0 },
-    configs: { series: [], totals: [], suppressed_count: 3 },
-    debounced: { series: [], totals: [{ value: "a", n: 7 }], suppressed_count: 0 },
+    debounced: { series: [], totals: [], suppressed_count: 3 },
   },
   panels: {
     versions: {
@@ -197,7 +202,7 @@ async function runPage(fetchImpl: () => Promise<unknown>, localStorage?: unknown
   els.panels = panels;
   const kpis: Record<string, El> = {};
   const foots: Record<string, El> = {};
-  for (const k of ["events", "configs", "debounced"]) {
+  for (const k of ["events", "debounced"]) {
     kpis[k] = makeEl("div");
     foots[k] = makeEl("div");
   }
@@ -245,9 +250,8 @@ describe("public.js behaviour", () => {
   it("fills KPIs, handling suppressed totals", async () => {
     const r = await runPage(ok(fixture));
     expect(r.kpis.events.textContent).toBe("1,234");
-    expect(r.kpis.debounced.textContent).toBe("7");
-    expect(r.kpis.configs.textContent).toBe("Suppressed");
-    expect(r.foots.configs.textContent).toBe("Below the n<5 threshold");
+    expect(r.kpis.debounced.textContent).toBe("Suppressed");
+    expect(r.foots.debounced.textContent).toBe("Below the n<5 threshold");
   });
 
   it("formats the last-updated line and range", async () => {

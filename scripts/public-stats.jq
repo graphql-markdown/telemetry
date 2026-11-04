@@ -38,7 +38,6 @@
     min_count: $min,
     kpis: {
       events: panel("event"; "raw"; $all; null),
-      configs: panel("event"; "debounced_1d"; $all; null),
       debounced: panel("event"; "debounced_1d"; $all; null)
     },
     panels: {
