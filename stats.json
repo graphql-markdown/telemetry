@@ -1,0 +1,2301 @@
+{
+  "version": 2,
+  "generated": "2026-11-07T09:48:38Z",
+  "from": "2026-08-10",
+  "to": "2026-11-07",
+  "min_count": 5,
+  "kpis": {
+    "events": {
+      "series": [
+        {
+          "day": "2026-10-13",
+          "value": "config",
+          "n": 21
+        },
+        {
+          "day": "2026-10-13",
+          "value": "generate",
+          "n": 27
+        },
+        {
+          "day": "2026-10-14",
+          "value": "config",
+          "n": 16
+        },
+        {
+          "day": "2026-10-14",
+          "value": "generate",
+          "n": 20
+        },
+        {
+          "day": "2026-10-15",
+          "value": "config",
+          "n": 17
+        },
+        {
+          "day": "2026-10-15",
+          "value": "generate",
+          "n": 20
+        },
+        {
+          "day": "2026-10-16",
+          "value": "config",
+          "n": 22
+        },
+        {
+          "day": "2026-10-16",
+          "value": "generate",
+          "n": 27
+        },
+        {
+          "day": "2026-10-17",
+          "value": "config",
+          "n": 25
+        },
+        {
+          "day": "2026-10-17",
+          "value": "generate",
+          "n": 34
+        },
+        {
+          "day": "2026-10-18",
+          "value": "config",
+          "n": 14
+        },
+        {
+          "day": "2026-10-18",
+          "value": "generate",
+          "n": 14
+        },
+        {
+          "day": "2026-10-19",
+          "value": "config",
+          "n": 41
+        },
+        {
+          "day": "2026-10-19",
+          "value": "generate",
+          "n": 102
+        },
+        {
+          "day": "2026-10-20",
+          "value": "config",
+          "n": 113
+        },
+        {
+          "day": "2026-10-20",
+          "value": "generate",
+          "n": 297
+        },
+        {
+          "day": "2026-10-21",
+          "value": "config",
+          "n": 121
+        },
+        {
+          "day": "2026-10-21",
+          "value": "generate",
+          "n": 245
+        },
+        {
+          "day": "2026-10-22",
+          "value": "config",
+          "n": 110
+        },
+        {
+          "day": "2026-10-22",
+          "value": "generate",
+          "n": 210
+        },
+        {
+          "day": "2026-10-23",
+          "value": "config",
+          "n": 222
+        },
+        {
+          "day": "2026-10-23",
+          "value": "generate",
+          "n": 532
+        },
+        {
+          "day": "2026-10-24",
+          "value": "config",
+          "n": 110
+        },
+        {
+          "day": "2026-10-24",
+          "value": "generate",
+          "n": 228
+        },
+        {
+          "day": "2026-10-25",
+          "value": "config",
+          "n": 108
+        },
+        {
+          "day": "2026-10-25",
+          "value": "generate",
+          "n": 247
+        },
+        {
+          "day": "2026-10-26",
+          "value": "config",
+          "n": 375
+        },
+        {
+          "day": "2026-10-26",
+          "value": "generate",
+          "n": 582
+        },
+        {
+          "day": "2026-10-27",
+          "value": "config",
+          "n": 268
+        },
+        {
+          "day": "2026-10-27",
+          "value": "generate",
+          "n": 355
+        },
+        {
+          "day": "2026-10-28",
+          "value": "config",
+          "n": 256
+        },
+        {
+          "day": "2026-10-28",
+          "value": "generate",
+          "n": 389
+        },
+        {
+          "day": "2026-10-29",
+          "value": "config",
+          "n": 428
+        },
+        {
+          "day": "2026-10-29",
+          "value": "generate",
+          "n": 583
+        },
+        {
+          "day": "2026-10-30",
+          "value": "config",
+          "n": 142
+        },
+        {
+          "day": "2026-10-30",
+          "value": "generate",
+          "n": 270
+        },
+        {
+          "day": "2026-10-31",
+          "value": "config",
+          "n": 94
+        },
+        {
+          "day": "2026-10-31",
+          "value": "generate",
+          "n": 296
+        },
+        {
+          "day": "2026-11-01",
+          "value": "config",
+          "n": 51
+        },
+        {
+          "day": "2026-11-01",
+          "value": "generate",
+          "n": 66
+        },
+        {
+          "day": "2026-11-02",
+          "value": "config",
+          "n": 245
+        },
+        {
+          "day": "2026-11-02",
+          "value": "generate",
+          "n": 446
+        },
+        {
+          "day": "2026-11-03",
+          "value": "config",
+          "n": 127
+        },
+        {
+          "day": "2026-11-03",
+          "value": "generate",
+          "n": 248
+        },
+        {
+          "day": "2026-11-04",
+          "value": "config",
+          "n": 151
+        },
+        {
+          "day": "2026-11-04",
+          "value": "generate",
+          "n": 337
+        },
+        {
+          "day": "2026-11-05",
+          "value": "config",
+          "n": 99
+        },
+        {
+          "day": "2026-11-05",
+          "value": "generate",
+          "n": 256
+        },
+        {
+          "day": "2026-11-06",
+          "value": "config",
+          "n": 252
+        },
+        {
+          "day": "2026-11-06",
+          "value": "generate",
+          "n": 434
+        }
+      ],
+      "totals": [
+        {
+          "value": "generate",
+          "n": 6265
+        },
+        {
+          "value": "config",
+          "n": 3428
+        }
+      ],
+      "suppressed_count": 1
+    },
+    "debounced": {
+      "series": [
+        {
+          "day": "2026-10-13",
+          "value": "config",
+          "n": 18
+        },
+        {
+          "day": "2026-10-13",
+          "value": "generate",
+          "n": 4
+        },
+        {
+          "day": "2026-10-14",
+          "value": "config",
+          "n": 3
+        },
+        {
+          "day": "2026-10-14",
+          "value": "generate",
+          "n": 2
+        },
+        {
+          "day": "2026-10-15",
+          "value": "config",
+          "n": 4
+        },
+        {
+          "day": "2026-10-15",
+          "value": "generate",
+          "n": 2
+        },
+        {
+          "day": "2026-10-16",
+          "value": "config",
+          "n": 7
+        },
+        {
+          "day": "2026-10-16",
+          "value": "generate",
+          "n": 2
+        },
+        {
+          "day": "2026-10-17",
+          "value": "config",
+          "n": 10
+        },
+        {
+          "day": "2026-10-17",
+          "value": "generate",
+          "n": 2
+        },
+        {
+          "day": "2026-10-18",
+          "value": "config",
+          "n": 3
+        },
+        {
+          "day": "2026-10-18",
+          "value": "generate",
+          "n": 1
+        },
+        {
+          "day": "2026-10-19",
+          "value": "config",
+          "n": 15
+        },
+        {
+          "day": "2026-10-19",
+          "value": "generate",
+          "n": 2
+        },
+        {
+          "day": "2026-10-20",
+          "value": "config",
+          "n": 13
+        },
+        {
+          "day": "2026-10-20",
+          "value": "generate",
+          "n": 3
+        },
+        {
+          "day": "2026-10-21",
+          "value": "config",
+          "n": 22
+        },
+        {
+          "day": "2026-10-21",
+          "value": "generate",
+          "n": 4
+        },
+        {
+          "day": "2026-10-22",
+          "value": "config",
+          "n": 26
+        },
+        {
+          "day": "2026-10-22",
+          "value": "generate",
+          "n": 4
+        },
+        {
+          "day": "2026-10-23",
+          "value": "config",
+          "n": 22
+        },
+        {
+          "day": "2026-10-23",
+          "value": "generate",
+          "n": 4
+        },
+        {
+          "day": "2026-10-24",
+          "value": "config",
+          "n": 4
+        },
+        {
+          "day": "2026-10-24",
+          "value": "generate",
+          "n": 2
+        },
+        {
+          "day": "2026-10-25",
+          "value": "config",
+          "n": 13
+        },
+        {
+          "day": "2026-10-25",
+          "value": "generate",
+          "n": 2
+        },
+        {
+          "day": "2026-10-26",
+          "value": "config",
+          "n": 26
+        },
+        {
+          "day": "2026-10-26",
+          "value": "generate",
+          "n": 4
+        },
+        {
+          "day": "2026-10-27",
+          "value": "config",
+          "n": 18
+        },
+        {
+          "day": "2026-10-27",
+          "value": "generate",
+          "n": 3
+        },
+        {
+          "day": "2026-10-28",
+          "value": "config",
+          "n": 24
+        },
+        {
+          "day": "2026-10-28",
+          "value": "generate",
+          "n": 4
+        },
+        {
+          "day": "2026-10-29",
+          "value": "config",
+          "n": 19
+        },
+        {
+          "day": "2026-10-29",
+          "value": "generate",
+          "n": 4
+        },
+        {
+          "day": "2026-10-30",
+          "value": "config",
+          "n": 27
+        },
+        {
+          "day": "2026-10-30",
+          "value": "generate",
+          "n": 6
+        },
+        {
+          "day": "2026-10-31",
+          "value": "config",
+          "n": 19
+        },
+        {
+          "day": "2026-10-31",
+          "value": "generate",
+          "n": 8
+        },
+        {
+          "day": "2026-11-01",
+          "value": "config",
+          "n": 8
+        },
+        {
+          "day": "2026-11-01",
+          "value": "generate",
+          "n": 5
+        },
+        {
+          "day": "2026-11-02",
+          "value": "config",
+          "n": 29
+        },
+        {
+          "day": "2026-11-02",
+          "value": "generate",
+          "n": 8
+        },
+        {
+          "day": "2026-11-03",
+          "value": "config",
+          "n": 22
+        },
+        {
+          "day": "2026-11-03",
+          "value": "generate",
+          "n": 8
+        },
+        {
+          "day": "2026-11-04",
+          "value": "config",
+          "n": 19
+        },
+        {
+          "day": "2026-11-04",
+          "value": "generate",
+          "n": 7
+        },
+        {
+          "day": "2026-11-05",
+          "value": "config",
+          "n": 16
+        },
+        {
+          "day": "2026-11-05",
+          "value": "generate",
+          "n": 6
+        },
+        {
+          "day": "2026-11-06",
+          "value": "config",
+          "n": 25
+        },
+        {
+          "day": "2026-11-06",
+          "value": "generate",
+          "n": 6
+        }
+      ],
+      "totals": [
+        {
+          "value": "config",
+          "n": 412
+        },
+        {
+          "value": "generate",
+          "n": 103
+        }
+      ],
+      "suppressed_count": 1
+    }
+  },
+  "panels": {
+    "versions": {
+      "series": [
+        {
+          "day": "2026-10-13",
+          "value": "1.25",
+          "n": 48
+        },
+        {
+          "day": "2026-10-14",
+          "value": "1.25",
+          "n": 36
+        },
+        {
+          "day": "2026-10-15",
+          "value": "1.25",
+          "n": 37
+        },
+        {
+          "day": "2026-10-16",
+          "value": "1.25",
+          "n": 49
+        },
+        {
+          "day": "2026-10-17",
+          "value": "1.25",
+          "n": 59
+        },
+        {
+          "day": "2026-10-18",
+          "value": "1.25",
+          "n": 28
+        },
+        {
+          "day": "2026-10-19",
+          "value": "1.25",
+          "n": 143
+        },
+        {
+          "day": "2026-10-20",
+          "value": "1.25",
+          "n": 410
+        },
+        {
+          "day": "2026-10-21",
+          "value": "1.25",
+          "n": 366
+        },
+        {
+          "day": "2026-10-22",
+          "value": "1.25",
+          "n": 320
+        },
+        {
+          "day": "2026-10-23",
+          "value": "1.25",
+          "n": 754
+        },
+        {
+          "day": "2026-10-24",
+          "value": "1.25",
+          "n": 337
+        },
+        {
+          "day": "2026-10-25",
+          "value": "1.25",
+          "n": 355
+        },
+        {
+          "day": "2026-10-26",
+          "value": "1.25",
+          "n": 957
+        },
+        {
+          "day": "2026-10-27",
+          "value": "1.25",
+          "n": 620
+        },
+        {
+          "day": "2026-10-27",
+          "value": "1.26",
+          "n": 3
+        },
+        {
+          "day": "2026-10-28",
+          "value": "1.25",
+          "n": 645
+        },
+        {
+          "day": "2026-10-29",
+          "value": "1.25",
+          "n": 1005
+        },
+        {
+          "day": "2026-10-29",
+          "value": "1.26",
+          "n": 6
+        },
+        {
+          "day": "2026-10-30",
+          "value": "1.25",
+          "n": 388
+        },
+        {
+          "day": "2026-10-30",
+          "value": "1.26",
+          "n": 24
+        },
+        {
+          "day": "2026-10-31",
+          "value": "1.25",
+          "n": 309
+        },
+        {
+          "day": "2026-10-31",
+          "value": "1.26",
+          "n": 81
+        },
+        {
+          "day": "2026-11-01",
+          "value": "1.25",
+          "n": 77
+        },
+        {
+          "day": "2026-11-01",
+          "value": "1.26",
+          "n": 40
+        },
+        {
+          "day": "2026-11-02",
+          "value": "1.25",
+          "n": 605
+        },
+        {
+          "day": "2026-11-02",
+          "value": "1.26",
+          "n": 86
+        },
+        {
+          "day": "2026-11-03",
+          "value": "1.25",
+          "n": 258
+        },
+        {
+          "day": "2026-11-03",
+          "value": "1.26",
+          "n": 117
+        },
+        {
+          "day": "2026-11-04",
+          "value": "1.25",
+          "n": 386
+        },
+        {
+          "day": "2026-11-04",
+          "value": "1.26",
+          "n": 102
+        },
+        {
+          "day": "2026-11-05",
+          "value": "1.25",
+          "n": 267
+        },
+        {
+          "day": "2026-11-05",
+          "value": "1.26",
+          "n": 88
+        },
+        {
+          "day": "2026-11-06",
+          "value": "1.25",
+          "n": 323
+        },
+        {
+          "day": "2026-11-06",
+          "value": "1.26",
+          "n": 363
+        }
+      ],
+      "totals": [
+        {
+          "value": "1.25",
+          "n": 8782
+        },
+        {
+          "value": "1.26",
+          "n": 910
+        }
+      ],
+      "suppressed_count": 2
+    },
+    "ci": {
+      "series": [
+        {
+          "day": "2026-10-13",
+          "value": "0",
+          "n": 23
+        },
+        {
+          "day": "2026-10-13",
+          "value": "1",
+          "n": 25
+        },
+        {
+          "day": "2026-10-14",
+          "value": "1",
+          "n": 36
+        },
+        {
+          "day": "2026-10-15",
+          "value": "0",
+          "n": 2
+        },
+        {
+          "day": "2026-10-15",
+          "value": "1",
+          "n": 35
+        },
+        {
+          "day": "2026-10-16",
+          "value": "0",
+          "n": 9
+        },
+        {
+          "day": "2026-10-16",
+          "value": "1",
+          "n": 40
+        },
+        {
+          "day": "2026-10-17",
+          "value": "0",
+          "n": 36
+        },
+        {
+          "day": "2026-10-17",
+          "value": "1",
+          "n": 23
+        },
+        {
+          "day": "2026-10-18",
+          "value": "1",
+          "n": 28
+        },
+        {
+          "day": "2026-10-19",
+          "value": "0",
+          "n": 66
+        },
+        {
+          "day": "2026-10-19",
+          "value": "1",
+          "n": 77
+        },
+        {
+          "day": "2026-10-20",
+          "value": "0",
+          "n": 110
+        },
+        {
+          "day": "2026-10-20",
+          "value": "1",
+          "n": 300
+        },
+        {
+          "day": "2026-10-21",
+          "value": "0",
+          "n": 66
+        },
+        {
+          "day": "2026-10-21",
+          "value": "1",
+          "n": 300
+        },
+        {
+          "day": "2026-10-22",
+          "value": "0",
+          "n": 74
+        },
+        {
+          "day": "2026-10-22",
+          "value": "1",
+          "n": 246
+        },
+        {
+          "day": "2026-10-23",
+          "value": "0",
+          "n": 195
+        },
+        {
+          "day": "2026-10-23",
+          "value": "1",
+          "n": 559
+        },
+        {
+          "day": "2026-10-24",
+          "value": "0",
+          "n": 37
+        },
+        {
+          "day": "2026-10-24",
+          "value": "1",
+          "n": 301
+        },
+        {
+          "day": "2026-10-25",
+          "value": "0",
+          "n": 74
+        },
+        {
+          "day": "2026-10-25",
+          "value": "1",
+          "n": 281
+        },
+        {
+          "day": "2026-10-26",
+          "value": "0",
+          "n": 139
+        },
+        {
+          "day": "2026-10-26",
+          "value": "1",
+          "n": 818
+        },
+        {
+          "day": "2026-10-27",
+          "value": "0",
+          "n": 59
+        },
+        {
+          "day": "2026-10-27",
+          "value": "1",
+          "n": 564
+        },
+        {
+          "day": "2026-10-28",
+          "value": "0",
+          "n": 96
+        },
+        {
+          "day": "2026-10-28",
+          "value": "1",
+          "n": 549
+        },
+        {
+          "day": "2026-10-29",
+          "value": "0",
+          "n": 126
+        },
+        {
+          "day": "2026-10-29",
+          "value": "1",
+          "n": 885
+        },
+        {
+          "day": "2026-10-30",
+          "value": "0",
+          "n": 78
+        },
+        {
+          "day": "2026-10-30",
+          "value": "1",
+          "n": 334
+        },
+        {
+          "day": "2026-10-31",
+          "value": "0",
+          "n": 198
+        },
+        {
+          "day": "2026-10-31",
+          "value": "1",
+          "n": 192
+        },
+        {
+          "day": "2026-11-01",
+          "value": "0",
+          "n": 15
+        },
+        {
+          "day": "2026-11-01",
+          "value": "1",
+          "n": 102
+        },
+        {
+          "day": "2026-11-02",
+          "value": "0",
+          "n": 262
+        },
+        {
+          "day": "2026-11-02",
+          "value": "1",
+          "n": 430
+        },
+        {
+          "day": "2026-11-03",
+          "value": "0",
+          "n": 177
+        },
+        {
+          "day": "2026-11-03",
+          "value": "1",
+          "n": 198
+        },
+        {
+          "day": "2026-11-04",
+          "value": "0",
+          "n": 204
+        },
+        {
+          "day": "2026-11-04",
+          "value": "1",
+          "n": 284
+        },
+        {
+          "day": "2026-11-05",
+          "value": "0",
+          "n": 193
+        },
+        {
+          "day": "2026-11-05",
+          "value": "1",
+          "n": 162
+        },
+        {
+          "day": "2026-11-06",
+          "value": "0",
+          "n": 252
+        },
+        {
+          "day": "2026-11-06",
+          "value": "1",
+          "n": 434
+        }
+      ],
+      "totals": [
+        {
+          "value": "1",
+          "n": 7203
+        },
+        {
+          "value": "0",
+          "n": 2491
+        }
+      ],
+      "suppressed_count": 0
+    },
+    "provider": {
+      "series": [
+        {
+          "day": "2026-10-13",
+          "value": "github-actions",
+          "n": 20
+        },
+        {
+          "day": "2026-10-13",
+          "value": "gitlab",
+          "n": 5
+        },
+        {
+          "day": "2026-10-14",
+          "value": "github-actions",
+          "n": 7
+        },
+        {
+          "day": "2026-10-14",
+          "value": "gitlab",
+          "n": 29
+        },
+        {
+          "day": "2026-10-15",
+          "value": "github-actions",
+          "n": 3
+        },
+        {
+          "day": "2026-10-15",
+          "value": "gitlab",
+          "n": 26
+        },
+        {
+          "day": "2026-10-15",
+          "value": "other",
+          "n": 6
+        },
+        {
+          "day": "2026-10-16",
+          "value": "github-actions",
+          "n": 6
+        },
+        {
+          "day": "2026-10-16",
+          "value": "gitlab",
+          "n": 34
+        },
+        {
+          "day": "2026-10-17",
+          "value": "github-actions",
+          "n": 15
+        },
+        {
+          "day": "2026-10-17",
+          "value": "gitlab",
+          "n": 8
+        },
+        {
+          "day": "2026-10-18",
+          "value": "github-actions",
+          "n": 24
+        },
+        {
+          "day": "2026-10-18",
+          "value": "gitlab",
+          "n": 4
+        },
+        {
+          "day": "2026-10-19",
+          "value": "github-actions",
+          "n": 64
+        },
+        {
+          "day": "2026-10-19",
+          "value": "gitlab",
+          "n": 5
+        },
+        {
+          "day": "2026-10-19",
+          "value": "other",
+          "n": 8
+        },
+        {
+          "day": "2026-10-20",
+          "value": "github-actions",
+          "n": 256
+        },
+        {
+          "day": "2026-10-20",
+          "value": "gitlab",
+          "n": 8
+        },
+        {
+          "day": "2026-10-20",
+          "value": "other",
+          "n": 34
+        },
+        {
+          "day": "2026-10-21",
+          "value": "github-actions",
+          "n": 238
+        },
+        {
+          "day": "2026-10-21",
+          "value": "gitlab",
+          "n": 18
+        },
+        {
+          "day": "2026-10-21",
+          "value": "other",
+          "n": 42
+        },
+        {
+          "day": "2026-10-22",
+          "value": "github-actions",
+          "n": 176
+        },
+        {
+          "day": "2026-10-22",
+          "value": "gitlab",
+          "n": 34
+        },
+        {
+          "day": "2026-10-22",
+          "value": "other",
+          "n": 36
+        },
+        {
+          "day": "2026-10-23",
+          "value": "github-actions",
+          "n": 487
+        },
+        {
+          "day": "2026-10-23",
+          "value": "gitlab",
+          "n": 29
+        },
+        {
+          "day": "2026-10-23",
+          "value": "other",
+          "n": 43
+        },
+        {
+          "day": "2026-10-24",
+          "value": "github-actions",
+          "n": 276
+        },
+        {
+          "day": "2026-10-24",
+          "value": "other",
+          "n": 25
+        },
+        {
+          "day": "2026-10-25",
+          "value": "github-actions",
+          "n": 257
+        },
+        {
+          "day": "2026-10-25",
+          "value": "other",
+          "n": 24
+        },
+        {
+          "day": "2026-10-26",
+          "value": "github-actions",
+          "n": 742
+        },
+        {
+          "day": "2026-10-26",
+          "value": "gitlab",
+          "n": 38
+        },
+        {
+          "day": "2026-10-26",
+          "value": "other",
+          "n": 38
+        },
+        {
+          "day": "2026-10-27",
+          "value": "github-actions",
+          "n": 512
+        },
+        {
+          "day": "2026-10-27",
+          "value": "gitlab",
+          "n": 20
+        },
+        {
+          "day": "2026-10-27",
+          "value": "other",
+          "n": 32
+        },
+        {
+          "day": "2026-10-28",
+          "value": "github-actions",
+          "n": 463
+        },
+        {
+          "day": "2026-10-28",
+          "value": "gitlab",
+          "n": 42
+        },
+        {
+          "day": "2026-10-28",
+          "value": "other",
+          "n": 44
+        },
+        {
+          "day": "2026-10-29",
+          "value": "github-actions",
+          "n": 810
+        },
+        {
+          "day": "2026-10-29",
+          "value": "gitlab",
+          "n": 37
+        },
+        {
+          "day": "2026-10-29",
+          "value": "other",
+          "n": 38
+        },
+        {
+          "day": "2026-10-30",
+          "value": "github-actions",
+          "n": 312
+        },
+        {
+          "day": "2026-10-30",
+          "value": "gitlab",
+          "n": 4
+        },
+        {
+          "day": "2026-10-30",
+          "value": "other",
+          "n": 18
+        },
+        {
+          "day": "2026-10-31",
+          "value": "github-actions",
+          "n": 190
+        },
+        {
+          "day": "2026-10-31",
+          "value": "gitlab",
+          "n": 2
+        },
+        {
+          "day": "2026-11-01",
+          "value": "github-actions",
+          "n": 80
+        },
+        {
+          "day": "2026-11-01",
+          "value": "gitlab",
+          "n": 22
+        },
+        {
+          "day": "2026-11-02",
+          "value": "github-actions",
+          "n": 404
+        },
+        {
+          "day": "2026-11-02",
+          "value": "gitlab",
+          "n": 24
+        },
+        {
+          "day": "2026-11-02",
+          "value": "other",
+          "n": 2
+        },
+        {
+          "day": "2026-11-03",
+          "value": "github-actions",
+          "n": 160
+        },
+        {
+          "day": "2026-11-03",
+          "value": "gitlab",
+          "n": 36
+        },
+        {
+          "day": "2026-11-03",
+          "value": "other",
+          "n": 2
+        },
+        {
+          "day": "2026-11-04",
+          "value": "github-actions",
+          "n": 258
+        },
+        {
+          "day": "2026-11-04",
+          "value": "gitlab",
+          "n": 20
+        },
+        {
+          "day": "2026-11-04",
+          "value": "other",
+          "n": 6
+        },
+        {
+          "day": "2026-11-05",
+          "value": "github-actions",
+          "n": 150
+        },
+        {
+          "day": "2026-11-05",
+          "value": "gitlab",
+          "n": 11
+        },
+        {
+          "day": "2026-11-05",
+          "value": "other",
+          "n": 1
+        },
+        {
+          "day": "2026-11-06",
+          "value": "github-actions",
+          "n": 366
+        },
+        {
+          "day": "2026-11-06",
+          "value": "gitlab",
+          "n": 60
+        },
+        {
+          "day": "2026-11-06",
+          "value": "other",
+          "n": 8
+        }
+      ],
+      "totals": [
+        {
+          "value": "github-actions",
+          "n": 6276
+        },
+        {
+          "value": "gitlab",
+          "n": 516
+        },
+        {
+          "value": "other",
+          "n": 407
+        }
+      ],
+      "suppressed_count": 1
+    },
+    "formatter": {
+      "series": [
+        {
+          "day": "2026-10-13",
+          "value": "",
+          "n": 2
+        },
+        {
+          "day": "2026-10-13",
+          "value": "<custom-formatter>",
+          "n": 7
+        },
+        {
+          "day": "2026-10-13",
+          "value": "@graphql-markdown/formatters/starlight",
+          "n": 2
+        },
+        {
+          "day": "2026-10-13",
+          "value": "unknown-value",
+          "n": 6
+        },
+        {
+          "day": "2026-10-14",
+          "value": "@graphql-markdown/formatters/mkdocs",
+          "n": 1
+        },
+        {
+          "day": "2026-10-14",
+          "value": "unknown-value",
+          "n": 15
+        },
+        {
+          "day": "2026-10-15",
+          "value": "@graphql-markdown/formatters/mkdocs",
+          "n": 1
+        },
+        {
+          "day": "2026-10-15",
+          "value": "unknown-value",
+          "n": 16
+        },
+        {
+          "day": "2026-10-16",
+          "value": "",
+          "n": 1
+        },
+        {
+          "day": "2026-10-16",
+          "value": "@graphql-markdown/formatters/mkdocs",
+          "n": 1
+        },
+        {
+          "day": "2026-10-16",
+          "value": "unknown-value",
+          "n": 20
+        },
+        {
+          "day": "2026-10-17",
+          "value": "@graphql-markdown/formatters/mkdocs",
+          "n": 1
+        },
+        {
+          "day": "2026-10-17",
+          "value": "unknown-value",
+          "n": 24
+        },
+        {
+          "day": "2026-10-18",
+          "value": "@graphql-markdown/formatters/mkdocs",
+          "n": 2
+        },
+        {
+          "day": "2026-10-18",
+          "value": "unknown-value",
+          "n": 12
+        },
+        {
+          "day": "2026-10-19",
+          "value": "<custom-formatter>",
+          "n": 1
+        },
+        {
+          "day": "2026-10-19",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 11
+        },
+        {
+          "day": "2026-10-19",
+          "value": "@graphql-markdown/formatters/starlight",
+          "n": 6
+        },
+        {
+          "day": "2026-10-19",
+          "value": "unknown-value",
+          "n": 23
+        },
+        {
+          "day": "2026-10-20",
+          "value": "<custom-formatter>",
+          "n": 6
+        },
+        {
+          "day": "2026-10-20",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 106
+        },
+        {
+          "day": "2026-10-20",
+          "value": "@graphql-markdown/formatters/mkdocs",
+          "n": 1
+        },
+        {
+          "day": "2026-10-21",
+          "value": "<custom-formatter>",
+          "n": 3
+        },
+        {
+          "day": "2026-10-21",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 117
+        },
+        {
+          "day": "2026-10-21",
+          "value": "@graphql-markdown/formatters/mkdocs",
+          "n": 1
+        },
+        {
+          "day": "2026-10-22",
+          "value": "<custom-formatter>",
+          "n": 5
+        },
+        {
+          "day": "2026-10-22",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 105
+        },
+        {
+          "day": "2026-10-23",
+          "value": "",
+          "n": 1
+        },
+        {
+          "day": "2026-10-23",
+          "value": "<custom-formatter>",
+          "n": 7
+        },
+        {
+          "day": "2026-10-23",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 214
+        },
+        {
+          "day": "2026-10-24",
+          "value": "<custom-formatter>",
+          "n": 1
+        },
+        {
+          "day": "2026-10-24",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 109
+        },
+        {
+          "day": "2026-10-25",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 106
+        },
+        {
+          "day": "2026-10-25",
+          "value": "@graphql-markdown/formatters/mkdocs",
+          "n": 2
+        },
+        {
+          "day": "2026-10-26",
+          "value": "",
+          "n": 1
+        },
+        {
+          "day": "2026-10-26",
+          "value": "<custom-formatter>",
+          "n": 6
+        },
+        {
+          "day": "2026-10-26",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 368
+        },
+        {
+          "day": "2026-10-27",
+          "value": "",
+          "n": 9
+        },
+        {
+          "day": "2026-10-27",
+          "value": "<custom-formatter>",
+          "n": 4
+        },
+        {
+          "day": "2026-10-27",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 254
+        },
+        {
+          "day": "2026-10-27",
+          "value": "@graphql-markdown/formatters/mkdocs",
+          "n": 1
+        },
+        {
+          "day": "2026-10-28",
+          "value": "",
+          "n": 8
+        },
+        {
+          "day": "2026-10-28",
+          "value": "<custom-formatter>",
+          "n": 9
+        },
+        {
+          "day": "2026-10-28",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 238
+        },
+        {
+          "day": "2026-10-28",
+          "value": "@graphql-markdown/formatters/mkdocs",
+          "n": 1
+        },
+        {
+          "day": "2026-10-29",
+          "value": "",
+          "n": 6
+        },
+        {
+          "day": "2026-10-29",
+          "value": "<custom-formatter>",
+          "n": 15
+        },
+        {
+          "day": "2026-10-29",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 407
+        },
+        {
+          "day": "2026-10-30",
+          "value": "",
+          "n": 2
+        },
+        {
+          "day": "2026-10-30",
+          "value": "<custom-formatter>",
+          "n": 8
+        },
+        {
+          "day": "2026-10-30",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 132
+        },
+        {
+          "day": "2026-10-31",
+          "value": "",
+          "n": 4
+        },
+        {
+          "day": "2026-10-31",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 90
+        },
+        {
+          "day": "2026-11-01",
+          "value": "",
+          "n": 7
+        },
+        {
+          "day": "2026-11-01",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 44
+        },
+        {
+          "day": "2026-11-02",
+          "value": "",
+          "n": 8
+        },
+        {
+          "day": "2026-11-02",
+          "value": "<custom-formatter>",
+          "n": 11
+        },
+        {
+          "day": "2026-11-02",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 226
+        },
+        {
+          "day": "2026-11-03",
+          "value": "",
+          "n": 2
+        },
+        {
+          "day": "2026-11-03",
+          "value": "<custom-formatter>",
+          "n": 7
+        },
+        {
+          "day": "2026-11-03",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 117
+        },
+        {
+          "day": "2026-11-03",
+          "value": "@graphql-markdown/formatters/mkdocs",
+          "n": 1
+        },
+        {
+          "day": "2026-11-04",
+          "value": "<custom-formatter>",
+          "n": 4
+        },
+        {
+          "day": "2026-11-04",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 145
+        },
+        {
+          "day": "2026-11-04",
+          "value": "@graphql-markdown/formatters/mkdocs",
+          "n": 2
+        },
+        {
+          "day": "2026-11-05",
+          "value": "<custom-formatter>",
+          "n": 6
+        },
+        {
+          "day": "2026-11-05",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 93
+        },
+        {
+          "day": "2026-11-06",
+          "value": "",
+          "n": 1
+        },
+        {
+          "day": "2026-11-06",
+          "value": "<custom-formatter>",
+          "n": 20
+        },
+        {
+          "day": "2026-11-06",
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 231
+        }
+      ],
+      "totals": [
+        {
+          "value": "@graphql-markdown/docusaurus/mdx",
+          "n": 3113
+        },
+        {
+          "value": "<custom-formatter>",
+          "n": 120
+        },
+        {
+          "value": "unknown-value",
+          "n": 116
+        },
+        {
+          "value": "",
+          "n": 52
+        },
+        {
+          "value": "@graphql-markdown/formatters/mkdocs",
+          "n": 15
+        },
+        {
+          "value": "@graphql-markdown/formatters/starlight",
+          "n": 8
+        }
+      ],
+      "suppressed_count": 2
+    },
+    "graphql": {
+      "series": [
+        {
+          "day": "2026-10-13",
+          "value": "16",
+          "n": 28
+        },
+        {
+          "day": "2026-10-13",
+          "value": "17",
+          "n": 20
+        },
+        {
+          "day": "2026-10-14",
+          "value": "16",
+          "n": 19
+        },
+        {
+          "day": "2026-10-14",
+          "value": "17",
+          "n": 17
+        },
+        {
+          "day": "2026-10-15",
+          "value": "16",
+          "n": 37
+        },
+        {
+          "day": "2026-10-16",
+          "value": "16",
+          "n": 49
+        },
+        {
+          "day": "2026-10-17",
+          "value": "16",
+          "n": 59
+        },
+        {
+          "day": "2026-10-18",
+          "value": "16",
+          "n": 28
+        },
+        {
+          "day": "2026-10-19",
+          "value": "16",
+          "n": 143
+        },
+        {
+          "day": "2026-10-20",
+          "value": "16",
+          "n": 408
+        },
+        {
+          "day": "2026-10-20",
+          "value": "17",
+          "n": 2
+        },
+        {
+          "day": "2026-10-21",
+          "value": "16",
+          "n": 340
+        },
+        {
+          "day": "2026-10-21",
+          "value": "17",
+          "n": 26
+        },
+        {
+          "day": "2026-10-22",
+          "value": "16",
+          "n": 304
+        },
+        {
+          "day": "2026-10-22",
+          "value": "17",
+          "n": 16
+        },
+        {
+          "day": "2026-10-23",
+          "value": "16",
+          "n": 738
+        },
+        {
+          "day": "2026-10-23",
+          "value": "17",
+          "n": 16
+        },
+        {
+          "day": "2026-10-24",
+          "value": "16",
+          "n": 337
+        },
+        {
+          "day": "2026-10-24",
+          "value": "17",
+          "n": 1
+        },
+        {
+          "day": "2026-10-25",
+          "value": "16",
+          "n": 355
+        },
+        {
+          "day": "2026-10-26",
+          "value": "16",
+          "n": 933
+        },
+        {
+          "day": "2026-10-26",
+          "value": "17",
+          "n": 24
+        },
+        {
+          "day": "2026-10-27",
+          "value": "16",
+          "n": 603
+        },
+        {
+          "day": "2026-10-27",
+          "value": "17",
+          "n": 20
+        },
+        {
+          "day": "2026-10-28",
+          "value": "16",
+          "n": 629
+        },
+        {
+          "day": "2026-10-28",
+          "value": "17",
+          "n": 16
+        },
+        {
+          "day": "2026-10-29",
+          "value": "16",
+          "n": 988
+        },
+        {
+          "day": "2026-10-29",
+          "value": "17",
+          "n": 23
+        },
+        {
+          "day": "2026-10-30",
+          "value": "16",
+          "n": 390
+        },
+        {
+          "day": "2026-10-30",
+          "value": "17",
+          "n": 22
+        },
+        {
+          "day": "2026-10-31",
+          "value": "16",
+          "n": 386
+        },
+        {
+          "day": "2026-10-31",
+          "value": "17",
+          "n": 4
+        },
+        {
+          "day": "2026-11-01",
+          "value": "16",
+          "n": 110
+        },
+        {
+          "day": "2026-11-01",
+          "value": "17",
+          "n": 7
+        },
+        {
+          "day": "2026-11-02",
+          "value": "16",
+          "n": 632
+        },
+        {
+          "day": "2026-11-02",
+          "value": "17",
+          "n": 59
+        },
+        {
+          "day": "2026-11-03",
+          "value": "16",
+          "n": 333
+        },
+        {
+          "day": "2026-11-03",
+          "value": "17",
+          "n": 42
+        },
+        {
+          "day": "2026-11-04",
+          "value": "16",
+          "n": 469
+        },
+        {
+          "day": "2026-11-04",
+          "value": "17",
+          "n": 19
+        },
+        {
+          "day": "2026-11-05",
+          "value": "16",
+          "n": 295
+        },
+        {
+          "day": "2026-11-05",
+          "value": "17",
+          "n": 60
+        },
+        {
+          "day": "2026-11-06",
+          "value": "16",
+          "n": 661
+        },
+        {
+          "day": "2026-11-06",
+          "value": "17",
+          "n": 25
+        }
+      ],
+      "totals": [
+        {
+          "value": "16",
+          "n": 9274
+        },
+        {
+          "value": "17",
+          "n": 419
+        }
+      ],
+      "suppressed_count": 1
+    },
+    "loader": {
+      "series": [
+        {
+          "day": "2026-10-13",
+          "value": "file-sdl",
+          "n": 11
+        },
+        {
+          "day": "2026-10-13",
+          "value": "url",
+          "n": 10
+        },
+        {
+          "day": "2026-10-14",
+          "value": "file-sdl",
+          "n": 16
+        },
+        {
+          "day": "2026-10-15",
+          "value": "file-sdl",
+          "n": 17
+        },
+        {
+          "day": "2026-10-16",
+          "value": "file-sdl",
+          "n": 21
+        },
+        {
+          "day": "2026-10-16",
+          "value": "glob",
+          "n": 1
+        },
+        {
+          "day": "2026-10-17",
+          "value": "file-sdl",
+          "n": 11
+        },
+        {
+          "day": "2026-10-17",
+          "value": "glob",
+          "n": 14
+        },
+        {
+          "day": "2026-10-18",
+          "value": "file-sdl",
+          "n": 14
+        },
+        {
+          "day": "2026-10-19",
+          "value": "file-sdl",
+          "n": 21
+        },
+        {
+          "day": "2026-10-19",
+          "value": "glob",
+          "n": 20
+        },
+        {
+          "day": "2026-10-20",
+          "value": "file-sdl",
+          "n": 71
+        },
+        {
+          "day": "2026-10-20",
+          "value": "glob",
+          "n": 49
+        },
+        {
+          "day": "2026-10-21",
+          "value": "file-json",
+          "n": 3
+        },
+        {
+          "day": "2026-10-21",
+          "value": "file-sdl",
+          "n": 75
+        },
+        {
+          "day": "2026-10-21",
+          "value": "glob",
+          "n": 44
+        },
+        {
+          "day": "2026-10-21",
+          "value": "url",
+          "n": 1
+        },
+        {
+          "day": "2026-10-22",
+          "value": "file-sdl",
+          "n": 89
+        },
+        {
+          "day": "2026-10-22",
+          "value": "glob",
+          "n": 25
+        },
+        {
+          "day": "2026-10-23",
+          "value": "file-json",
+          "n": 1
+        },
+        {
+          "day": "2026-10-23",
+          "value": "file-sdl",
+          "n": 216
+        },
+        {
+          "day": "2026-10-23",
+          "value": "glob",
+          "n": 6
+        },
+        {
+          "day": "2026-10-24",
+          "value": "file-sdl",
+          "n": 110
+        },
+        {
+          "day": "2026-10-25",
+          "value": "file-sdl",
+          "n": 93
+        },
+        {
+          "day": "2026-10-25",
+          "value": "glob",
+          "n": 16
+        },
+        {
+          "day": "2026-10-26",
+          "value": "file-json",
+          "n": 1
+        },
+        {
+          "day": "2026-10-26",
+          "value": "file-sdl",
+          "n": 358
+        },
+        {
+          "day": "2026-10-26",
+          "value": "glob",
+          "n": 26
+        },
+        {
+          "day": "2026-10-26",
+          "value": "url",
+          "n": 1
+        },
+        {
+          "day": "2026-10-27",
+          "value": "file-sdl",
+          "n": 259
+        },
+        {
+          "day": "2026-10-27",
+          "value": "glob",
+          "n": 2
+        },
+        {
+          "day": "2026-10-28",
+          "value": "file-json",
+          "n": 1
+        },
+        {
+          "day": "2026-10-28",
+          "value": "file-sdl",
+          "n": 236
+        },
+        {
+          "day": "2026-10-28",
+          "value": "glob",
+          "n": 19
+        },
+        {
+          "day": "2026-10-29",
+          "value": "file-sdl",
+          "n": 420
+        },
+        {
+          "day": "2026-10-29",
+          "value": "glob",
+          "n": 8
+        },
+        {
+          "day": "2026-10-30",
+          "value": "file-json",
+          "n": 1
+        },
+        {
+          "day": "2026-10-30",
+          "value": "file-sdl",
+          "n": 129
+        },
+        {
+          "day": "2026-10-30",
+          "value": "glob",
+          "n": 15
+        },
+        {
+          "day": "2026-10-31",
+          "value": "file-sdl",
+          "n": 83
+        },
+        {
+          "day": "2026-10-31",
+          "value": "glob",
+          "n": 10
+        },
+        {
+          "day": "2026-11-01",
+          "value": "file-json",
+          "n": 1
+        },
+        {
+          "day": "2026-11-01",
+          "value": "file-sdl",
+          "n": 33
+        },
+        {
+          "day": "2026-11-01",
+          "value": "glob",
+          "n": 11
+        },
+        {
+          "day": "2026-11-02",
+          "value": "file-sdl",
+          "n": 234
+        },
+        {
+          "day": "2026-11-02",
+          "value": "glob",
+          "n": 14
+        },
+        {
+          "day": "2026-11-02",
+          "value": "url",
+          "n": 1
+        },
+        {
+          "day": "2026-11-03",
+          "value": "file-sdl",
+          "n": 116
+        },
+        {
+          "day": "2026-11-03",
+          "value": "glob",
+          "n": 20
+        },
+        {
+          "day": "2026-11-04",
+          "value": "file-json",
+          "n": 1
+        },
+        {
+          "day": "2026-11-04",
+          "value": "file-sdl",
+          "n": 149
+        },
+        {
+          "day": "2026-11-04",
+          "value": "glob",
+          "n": 6
+        },
+        {
+          "day": "2026-11-05",
+          "value": "file-sdl",
+          "n": 97
+        },
+        {
+          "day": "2026-11-05",
+          "value": "glob",
+          "n": 12
+        },
+        {
+          "day": "2026-11-06",
+          "value": "file-sdl",
+          "n": 248
+        },
+        {
+          "day": "2026-11-06",
+          "value": "glob",
+          "n": 3
+        }
+      ],
+      "totals": [
+        {
+          "value": "file-sdl",
+          "n": 3127
+        },
+        {
+          "value": "glob",
+          "n": 321
+        },
+        {
+          "value": "url",
+          "n": 13
+        },
+        {
+          "value": "file-json",
+          "n": 9
+        }
+      ],
+      "suppressed_count": 1
+    }
+  },
+  "settings": [
+    {
+      "key": "diffMethod",
+      "totals": [
+        {
+          "value": "<string>",
+          "n": 5
+        }
+      ],
+      "suppressed_count": 0
+    },
+    {
+      "key": "force",
+      "totals": [],
+      "suppressed_count": 1
+    },
+    {
+      "key": "hierarchy",
+      "totals": [],
+      "suppressed_count": 0
+    },
+    {
+      "key": "mdxParser",
+      "totals": [
+        {
+          "value": "<custom-formatter>",
+          "n": 79
+        }
+      ],
+      "suppressed_count": 0
+    },
+    {
+      "key": "pretty",
+      "totals": [
+        {
+          "value": "true",
+          "n": 236
+        }
+      ],
+      "suppressed_count": 0
+    },
+    {
+      "key": "telemetry",
+      "totals": [],
+      "suppressed_count": 0
+    }
+  ]
+}
