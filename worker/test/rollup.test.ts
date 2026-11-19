@@ -21,6 +21,7 @@ const keyOf = (sql: string): string => {
   if (sql.includes("AS error_type")) return "generate_errors";
   if (sql.includes("AS pages_p50")) return "generate_quantiles";
   if (sql.includes("AS failures")) return "generate";
+  if (sql.includes("blob4 = 'create-graphql-markdown-docs'")) return "create:blob5";
   return /SELECT (blob\d+) AS value/.exec(sql)?.[1] ?? "unknown";
 };
 
@@ -154,6 +155,23 @@ describe("rollupDay", () => {
     expect(sql).toContain("blob1 IN ('create_scaffold', 'create_wire')");
     expect(sql).toContain("blob19 != ''");
     expect(sql).toContain("blob17 = '0'");
+  });
+
+  it("splits versions by package", async () => {
+    mockAe({
+      blob5: [{ value: "1.26.1", raw: 7, debounced_1h: 5, debounced_1d: 4 }],
+      "create:blob5": [{ value: "1.1.2", raw: 3, debounced_1h: 2, debounced_1d: 2 }],
+    });
+    await rollupDay(makeEnv(), DAY);
+    const raw = (await counts()).filter((r) => r.measure === "raw" && /Version$/.test(String(r.dim)));
+    expect(raw).toEqual([
+      { ci: "0", dim: "createVersion", value: "1.1", measure: "raw", n: 3 },
+      { ci: "0", dim: "pkgVersion", value: "1.26", measure: "raw", n: 7 },
+    ]);
+    const versionSqls = sqls.filter((q) => q.includes("blob5 AS value"));
+    expect(versionSqls.some((q) => q.includes("blob4 = '@graphql-markdown/core'"))).toBe(true);
+    expect(versionSqls.some((q) => q.includes("blob4 = 'create-graphql-markdown-docs'"))).toBe(true);
+    expect(versionSqls.every((q) => q.includes("blob4 = "))).toBe(true);
   });
 
   it("keeps CI and local rows for the same config apart", async () => {

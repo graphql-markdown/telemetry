@@ -8,12 +8,23 @@ export const MAX_ROWS_PER_DAY = 2000;
 const MEASURES = ["raw", "debounced_1h", "debounced_1d"] as const;
 
 /**
+ * Each package reports its own version (blob5), so a version dimension is
+ * bound to one package (blob4).
+ */
+const VERSION_DIMS: Readonly<Record<string, string>> = {
+  pkgVersion: "@graphql-markdown/core",
+  createVersion: "create-graphql-markdown-docs",
+};
+
+/**
  * Single-blob dimensions: dimension name, its blob column (see `buildBlobs`)
  * and an optional event filter.
  */
 const BLOB_DIMS: ReadonlyArray<readonly [string, string, string?]> = [
   ["event", "blob1"],
-  ["pkgVersion", "blob5"],
+  ...Object.entries(VERSION_DIMS).map(
+    ([dim, pkg]) => [dim, "blob5", ` AND blob4 = '${pkg}'`] as const,
+  ),
   // Only config events carry a formatter; generate events would all count as "".
   ["formatter", "blob6", " AND blob1 = 'config'"],
   ["os", "blob8"],
@@ -293,14 +304,14 @@ export const rollupDay = async (env: Env, day: string): Promise<number> => {
 
   for (const [dim, column, extra = ""] of BLOB_DIMS) {
     for (const row of await query(env, dimSql(column, day, extra))) {
-      const value = dim === "pkgVersion" ? truncateVersion(row.value) : String(row.value);
+      const value = dim in VERSION_DIMS ? truncateVersion(row.value) : String(row.value);
       addMeasures(counts, dim, value, row);
       if (dim === "event" && value === "config") {
         configEvents += Number(row.raw ?? 0);
       }
     }
     for (const row of await query(env, coloSql(column, day, extra))) {
-      addColo(counts, dim, dim === "pkgVersion" ? truncateVersion(row.value) : String(row.value), row);
+      addColo(counts, dim, dim in VERSION_DIMS ? truncateVersion(row.value) : String(row.value), row);
       if (dim === "event" && String(row.value) === "config") {
         configEvents += Number(row.colo_sampled ?? 0);
       }

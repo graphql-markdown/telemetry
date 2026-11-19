@@ -10,6 +10,7 @@ const CATALOG_LIMIT = 50;
 export const DIMS = [
   "event",
   "pkgVersion",
+  "createVersion",
   "formatter",
   "loader.kind",
   "os",
